@@ -34,6 +34,34 @@ class GtfsLake:
                     with io.TextIOWrapper(gtfs_static_file.open(txt_filename), encoding='utf-8') as txt_file:
                         self._load_txt_file(txt_file, txt_filename.replace('.txt', ''))
 
+    def remove_agencies(self, agency_pattern, remove_dependent_objects=True):
+        self._connection.execute('DELETE FROM agency WHERE agency_id LIKE ?', [agency_pattern])
+        
+        if remove_dependent_objects:
+            self._remove_dependent_objects()
+
+    def remove_routes(self, route_pattern, remove_dependent_objects=True):
+        self._connection.execute('DELETE FROM routes WHERE route_id LIKE ?', [route_pattern])
+        
+        if remove_dependent_objects:
+            self._remove_dependent_objects()
+
+    def remove_trips(self, trip_pattern, remove_dependent_objects=True):
+        self._connection.execute('DELETE FROM trips WHERE trip_id LIKE ?', [trip_pattern])
+
+        if remove_dependent_objects:
+            self._remove_dependent_objects()
+
+    def _remove_dependent_objects(self):
+        self._connection.execute('DELETE FROM routes WHERE agency_id NOT IN (SELECT agency_id FROM agency)')
+        self._connection.execute('DELETE FROM trips WHERE route_id NOT IN (SELECT route_id FROM routes)')
+        self._connection.execute('DELETE FROM stop_times WHERE trip_id NOT IN (SELECT trip_id FROM trips)')
+        self._connection.execute('DELETE FROM shapes WHERE shape_id NOT IN (SELECT shape_id FROM trips)')
+        self._connection.execute('DELETE FROM transfers WHERE from_route_id NOT IN (SELECT route_id FROM routes) OR to_route_id NOT IN (SELECT route_id FROM routes)')
+        self._connection.execute('DELETE FROM transfers WHERE from_trip_id NOT IN (SELECT trip_id FROM trips) OR to_trip_id NOT IN (SELECT trip_id FROM trips)')
+        self._connection.execute('DELETE FROM calendar WHERE service_id NOT IN (SELECT service_id FROM trips)')
+        self._connection.execute('DELETE FROM calendar_dates WHERE service_id NOT IN (SELECT service_id FROM trips)')
+
     def _load_txt_file(self, txt_file, table_name):
 
         # run create statement to ensure destination table exists
