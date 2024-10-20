@@ -1,5 +1,6 @@
 import csv
 import duckdb
+import importlib
 import io
 import polars
 import zipfile
@@ -11,26 +12,25 @@ class GtfsLake:
     def __init__(self, database_filename):
         self._connection = duckdb.connect(database_filename)
 
+        self._tables = [
+            'agency', 
+            'calendar_dates', 
+            'calendar', 
+            'feed_info', 
+            'routes', 
+            'shapes', 
+            'stop_times', 
+            'stops', 
+            'transfers', 
+            'trips'
+        ]
+
         self._batch_size = 1000000
 
     def load_static(self, gtfs_static_filename):
-        
-        txt_filenames = [
-            'agency.txt', 
-            'calendar_dates.txt', 
-            'calendar.txt', 
-            'feed_info.txt', 
-            'routes.txt', 
-            'shapes.txt', 
-            'stop_times.txt', 
-            'stops.txt', 
-            'transfers.txt', 
-            'trips.txt'
-        ]
-        
         with zipfile.ZipFile(gtfs_static_filename) as gtfs_static_file:
             for txt_filename in gtfs_static_file.namelist():
-                if txt_filename in txt_filenames:
+                if txt_filename.replace('.txt', '') in self._tables:
                     with io.TextIOWrapper(gtfs_static_file.open(txt_filename), encoding='utf-8') as txt_file:
                         self._load_txt_file(txt_file, txt_filename.replace('.txt', ''))
 
@@ -51,6 +51,12 @@ class GtfsLake:
 
         if remove_dependent_objects:
             self._remove_dependent_objects()
+
+    def drop_subset(self, subset_filename, strategy_name):
+        subset = duckdb.connect(subset_filename)
+
+        strategy = importlib.import_module(f"gtfslake.strategy.{strategy_name}")
+        strategy.run(self._connection, subset, self._tables)
 
     def _remove_dependent_objects(self):
         self._connection.execute('DELETE FROM routes WHERE agency_id NOT IN (SELECT agency_id FROM agency)')

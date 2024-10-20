@@ -35,6 +35,17 @@ def remove(database, agencies, routes, trips):
 
     lake._remove_dependent_objects()
 
+@cli.command()
+@click.argument('database')
+@click.option('--inputs', '-i', multiple=True, help='Filename of the DDB subset which should be dropped to the lake')
+@click.option('--strategy', '-s', default='match_stop_id', help='Strategy used for matching existing data between the lake and the subset')
+def drop(database, inputs, strategy):
+    
+    lake = GtfsLake(database)
+
+    for subset in inputs:
+        lake.drop_subset(subset, strategy_name=strategy)
+
 
 if __name__ == '__main__':
     cli()
