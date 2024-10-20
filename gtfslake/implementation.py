@@ -2,7 +2,9 @@ import csv
 import duckdb
 import importlib
 import io
+import os
 import polars
+import tempfile
 import zipfile
 
 import gtfslake.ddbdef
@@ -57,6 +59,37 @@ class GtfsLake:
 
         strategy = importlib.import_module(f"gtfslake.strategy.{strategy_name}")
         strategy.run(self._connection, subset, self._tables)
+
+    def export_static(self, output, tmpdir=tempfile.gettempdir()):
+        if os.path.exists(output):
+            for tbl in self._tables:
+                filename = os.path.join(output, f"{tbl}.txt")                    
+                self._connection.sql(f"SELECT * FROM {tbl}").write_csv(filename, sep=',')
+
+        elif output.lower().endswith('.zip'):
+            
+            tmp_files = dict()
+            
+            try:
+                # export all tables to temporary txt files
+                for tbl in self._tables:
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                        filename = tmp.name
+                        tmp_files[f"{tbl}.txt"] = filename
+                    
+                    self._connection.sql(f"SELECT * FROM {tbl}").write_csv(filename, sep=',')
+                
+                with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as gtfs_static_file:
+                    for txt_filename, tmp_filename in tmp_files.items():
+                        gtfs_static_file.write(
+                            tmp_filename,
+                            txt_filename
+                        )
+            finally:
+                for tmp_file in tmp_files:
+                    if os.path.exists(tmp_file):
+                        os.remove(tmp_file)
+
 
     def _remove_dependent_objects(self):
         self._connection.execute('DELETE FROM routes WHERE agency_id NOT IN (SELECT agency_id FROM agency)')

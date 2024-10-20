@@ -46,6 +46,14 @@ def drop(database, inputs, strategy):
     for subset in inputs:
         lake.drop_subset(subset, strategy_name=strategy)
 
+@cli.command()
+@click.argument('database')
+@click.option('--output', '-o', help='Destination directory or ZIP file containing GTFS data')
+def export(database, output):
+    
+    lake = GtfsLake(database)
+    lake.export_static(output)
+
 
 if __name__ == '__main__':
     cli()
