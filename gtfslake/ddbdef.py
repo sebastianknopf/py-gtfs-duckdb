@@ -154,5 +154,30 @@ schema = {
         bikes_allowed			TEXT,
         PRIMARY KEY ( trip_id )
     ) 
+    """,
+    'realtime_vehicle_updates': """
+    CREATE TABLE IF NOT EXISTS realtime_vehicle_positions
+    (
+       trip_id                       TEXT,
+       trip_route_id                 TEXT,
+       trip_direction_id             TEXT,
+       trip_start_time               TEXT,
+       trip_start_date               TEXT,
+       trip_schedule_relationship    TEXT,
+       vehicle_id                    TEXT,
+       vehicle_label                 TEXT,
+       vehicle_license_plate         TEXT,
+       vehicle_wheelchair_accessible TEXT,
+       position_latitude             FLOAT NOT NULL,
+       position_longitude            FLOAT NOT NULL,
+       position_bearing              FLOAT,
+       position_odometer             FLOAT,
+       position_speed                FLOAT,
+       current_stop_status           INTEGER,
+       stop_id                       TEXT,
+       current_status                TEXT,
+       timestamp                     INTEGER,
+       congestion_level              TEXT
+    )
     """
 }
