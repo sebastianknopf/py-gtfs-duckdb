@@ -56,14 +56,14 @@ class GtfsLakeRealtimeServer:
 
         feed_message = {
             'header': {
-                'gtfsRealtimeVersion': '2.0',
+                'gtfs_realtime_version': '2.0',
                 'incrementality': 'FULL_DATASET',
                 'timestamp': '1653701655'
             },
             'entity': [
                 {
                     'id': '47110815',
-                    'isDeleted': False,
+                    'is_deleted': False,
                     'alert': {
                         'effect': 'OTHER_EFFECT',
                         'cause': 'OTHER_CAUSE',
@@ -90,6 +90,12 @@ class GtfsLakeRealtimeServer:
                             {
                                 'route_type': 1
                             }
+                        ],
+                        'active_period': [
+							{
+                                'start': 1730332800,
+                                'end': 1711929599
+                            }
                         ]
                     }
                 }
@@ -105,7 +111,7 @@ class GtfsLakeRealtimeServer:
             for informed_entity in alert_informed_entities.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
                 print(informed_entity['route_type'])
 
-        return ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage())
+        return Response(content=ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString(), media_type='application/protobuf') 
 
     async def _trip_updates(self, request: Request) -> Response:
         return 'Test'
