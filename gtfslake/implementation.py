@@ -15,22 +15,22 @@ class GtfsLake:
         self._connection = duckdb.connect(database_filename)
 
         self._tables = [
-            'agency', 
-            'calendar_dates', 
-            'calendar', 
-            'feed_info', 
-            'routes', 
-            'shapes', 
-            'stop_times', 
-            'stops', 
-            'transfers', 
+            'agency',
+            'calendar_dates',
+            'calendar',
+            'feed_info',
+            'routes',
+            'shapes',
+            'stop_times',
+            'stops',
+            'transfers',
             'trips'
         ]
 
         self._batch_size = 1000000
 
         # generate realtime tables
-        realtime_tables = [
+        self.realtime_tables = [
             'realtime_service_alerts',
             'realtime_alert_active_periods',
             'realtime_alert_informed_entities',
@@ -39,7 +39,7 @@ class GtfsLake:
             'realtime_vehicle_positions'
         ]
 
-        for realtime_table in realtime_tables:
+        for realtime_table in self.realtime_tables:
             create_stmt = gtfslake.ddbdef.schema[realtime_table]
             self._connection.execute(create_stmt)
 
@@ -52,13 +52,13 @@ class GtfsLake:
 
     def remove_agencies(self, agency_pattern, remove_dependent_objects=True):
         self._connection.execute('DELETE FROM agency WHERE agency_id LIKE ?', [agency_pattern])
-        
+
         if remove_dependent_objects:
             self._remove_dependent_objects()
 
     def remove_routes(self, route_pattern, remove_dependent_objects=True):
         self._connection.execute('DELETE FROM routes WHERE route_id LIKE ?', [route_pattern])
-        
+
         if remove_dependent_objects:
             self._remove_dependent_objects()
 
@@ -77,22 +77,21 @@ class GtfsLake:
     def export_static(self, output, tmpdir=tempfile.gettempdir()):
         if os.path.exists(output):
             for tbl in self._tables:
-                filename = os.path.join(output, f"{tbl}.txt")                    
+                filename = os.path.join(output, f"{tbl}.txt")
                 self._connection.sql(f"SELECT * FROM {tbl}").write_csv(filename, sep=',')
 
         elif output.lower().endswith('.zip'):
-            
             tmp_files = dict()
-            
+
             try:
                 # export all tables to temporary txt files
                 for tbl in self._tables:
                     with tempfile.NamedTemporaryFile(delete=False) as tmp:
                         filename = tmp.name
                         tmp_files[f"{tbl}.txt"] = filename
-                    
+
                     self._connection.sql(f"SELECT * FROM {tbl}").write_csv(filename, sep=',')
-                
+
                 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as gtfs_static_file:
                     for txt_filename, tmp_filename in tmp_files.items():
                         gtfs_static_file.write(
@@ -103,6 +102,14 @@ class GtfsLake:
                 for tmp_file in tmp_files:
                     if os.path.exists(tmp_file):
                         os.remove(tmp_file)
+
+    def fetch_realtime_service_alerts(self):
+
+        service_alerts = self._connection.table('realtime_service_alerts').select(duckdb.StarExpression())
+        alert_active_periods = self._connection.table('realtime_alert_active_periods').select(duckdb.StarExpression())
+        alert_informed_entities = self._connection.table('realtime_alert_informed_entities').select(duckdb.StarExpression())
+
+        return (service_alerts.pl(), alert_active_periods.pl(), alert_informed_entities.pl())
 
     def execute_sql(self, sqlfilename):
         with open(sqlfilename, 'r') as sql_file:

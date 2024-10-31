@@ -1,9 +1,13 @@
+import polars as pl
 import yaml
 
 from fastapi import APIRouter
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi import Response
+
+from google.transit import gtfs_realtime_pb2
+from google.protobuf.json_format import ParseDict
 
 from gtfslake.implementation import GtfsLake
 
@@ -48,7 +52,60 @@ class GtfsLakeRealtimeServer:
             self._cache = None
 
     async def _service_alerts(self, request: Request) -> Response:
-        return 'Test'
+        service_alerts, alert_active_periods, alert_informed_entities = self._lake.fetch_realtime_service_alerts()
+
+        feed_message = {
+            'header': {
+                'gtfsRealtimeVersion': '2.0',
+                'incrementality': 'FULL_DATASET',
+                'timestamp': '1653701655'
+            },
+            'entity': [
+                {
+                    'id': '47110815',
+                    'isDeleted': False,
+                    'alert': {
+                        'effect': 'OTHER_EFFECT',
+                        'cause': 'OTHER_CAUSE',
+                        'header_text': {
+                            'translation': [
+                                {
+                                    'text': 'Sample text',
+                                    'language': 'de'
+                                }
+                            ]
+                        },
+                        'description_text': {
+                            'translation': [
+                                {
+                                    'text': 'Longer sample text',
+                                    'language': 'de'
+                                }
+                            ]
+                        },
+                        'informed_entity': [
+                            {
+                                'route_type': 3
+                            },
+                            {
+                                'route_type': 1
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+
+        for service_alert in service_alerts.iter_rows(named=True):
+            print(service_alert['service_alert_id'])
+
+            for active_period in alert_active_periods.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
+                print(active_period['start_timestamp'])
+
+            for informed_entity in alert_informed_entities.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
+                print(informed_entity['route_type'])
+
+        return ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage())
 
     async def _trip_updates(self, request: Request) -> Response:
         return 'Test'

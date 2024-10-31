@@ -1,7 +1,9 @@
 click
 duckdb
 fastapi
+gtfs-realtime-bindings
 polars
+protobuf
 pyarrow
 pyyaml
 uvicorn
