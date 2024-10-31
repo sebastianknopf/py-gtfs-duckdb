@@ -90,6 +90,11 @@ class GtfsLake:
                     if os.path.exists(tmp_file):
                         os.remove(tmp_file)
 
+    def execute_sql(self, sqlfilename):
+        with open(sqlfilename, 'r') as sql_file:
+            sql_stmt = sql_file.read()
+
+        self._connection.execute(sql_stmt)
 
     def _remove_dependent_objects(self):
         self._connection.execute('DELETE FROM routes WHERE agency_id NOT IN (SELECT agency_id FROM agency)')

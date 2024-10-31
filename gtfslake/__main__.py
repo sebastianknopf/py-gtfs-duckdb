@@ -54,6 +54,16 @@ def export(database, output):
     lake = GtfsLake(database)
     lake.export_static(output)
 
+@cli.command()
+@click.argument('database')
+@click.option('--files', '-f', multiple=True, help='Filename of the file containing SQL statements')
+def sql(database, files):
+
+    lake = GtfsLake(database)
+
+    for sql_file in files:
+        lake.execute_sql(sql_file)
+
 
 if __name__ == '__main__':
     cli()
