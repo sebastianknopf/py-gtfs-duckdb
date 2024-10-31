@@ -1,4 +1,7 @@
 click
 duckdb
+fastapi
 polars
 pyarrow
+pyyaml
+uvicorn

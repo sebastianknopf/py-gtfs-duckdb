@@ -1,6 +1,8 @@
 import click
+import uvicorn
 
 from gtfslake.implementation import GtfsLake
+from gtfslake.realtime import GtfsLakeRealtimeServer
 
 
 @click.group()
@@ -64,6 +66,16 @@ def sql(database, files):
     for sql_file in files:
         lake.execute_sql(sql_file)
 
+@cli.command()
+@click.argument('database')
+@click.option('--host', '-h', help='Host to run the realtime server')
+@click.option('--port', '-p', help='Port to run the realtime server')
+@click.option('--config', '-c', default=None, help='Additional configuration file for realtime server')
+def realtime(database, config, host, port):
+
+    realtime = GtfsLakeRealtimeServer(database, config)
+
+    uvicorn.run(app=realtime.create(), host=host, port=int(port))
 
 if __name__ == '__main__':
     cli()
