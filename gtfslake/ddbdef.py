@@ -36,7 +36,7 @@ schema = {
         start_date 				INTEGER NOT NULL,
         end_date 					INTEGER NOT NULL,
         PRIMARY KEY ( service_id )
-    )       
+    )
     """,
     'feed_info': """
     CREATE TABLE IF NOT EXISTS feed_info
@@ -124,7 +124,7 @@ schema = {
         level_id						TEXT,
         platform_code					TEXT,
         PRIMARY KEY ( stop_id )
-    )        
+    )
     """,
     'transfers': """
     CREATE TABLE IF NOT EXISTS transfers
@@ -153,31 +153,100 @@ schema = {
         wheelchair_accessible	TEXT,
         bikes_allowed			TEXT,
         PRIMARY KEY ( trip_id )
-    ) 
+    )
     """,
-    'realtime_vehicle_updates': """
+    'realtime_vehicle_positions': """
     CREATE TABLE IF NOT EXISTS realtime_vehicle_positions
     (
-       trip_id                       TEXT,
-       trip_route_id                 TEXT,
-       trip_direction_id             TEXT,
-       trip_start_time               TEXT,
-       trip_start_date               TEXT,
-       trip_schedule_relationship    TEXT,
-       vehicle_id                    TEXT,
-       vehicle_label                 TEXT,
-       vehicle_license_plate         TEXT,
-       vehicle_wheelchair_accessible TEXT,
-       position_latitude             FLOAT NOT NULL,
-       position_longitude            FLOAT NOT NULL,
-       position_bearing              FLOAT,
-       position_odometer             FLOAT,
-       position_speed                FLOAT,
-       current_stop_status           INTEGER,
-       stop_id                       TEXT,
-       current_status                TEXT,
-       timestamp                     INTEGER,
-       congestion_level              TEXT
+        trip_id                       TEXT,
+        trip_route_id                 TEXT,
+        trip_direction_id             TEXT,
+        trip_start_time               TEXT,
+        trip_start_date               TEXT,
+        trip_schedule_relationship    TEXT,
+        vehicle_id                    TEXT,
+        vehicle_label                 TEXT,
+        vehicle_license_plate         TEXT,
+        vehicle_wheelchair_accessible TEXT,
+        position_latitude             FLOAT NOT NULL,
+        position_longitude            FLOAT NOT NULL,
+        position_bearing              FLOAT,
+        position_odometer             FLOAT,
+        position_speed                FLOAT,
+        current_stop_status           INTEGER,
+        stop_id                       TEXT,
+        current_status                TEXT,
+        timestamp                     INTEGER,
+        congestion_level              TEXT
+    )
+    """,
+    'realtime_trip_updates': """
+    CREATE TABLE IF NOT EXISTS realtime_trip_updates
+    (
+        msg_id TEXT NOT NULL,
+        trip_id TEXT,
+        trip_route_id TEXT,
+        trip_direction_id TEXT,
+        trip_start_time TEXT,
+        trip_start_date TEXT,
+        trip_schedule_relationship TEXT,
+        vehicle_id TEXT,
+        vehicle_label TEXT,
+        vehicle_license_plate TEXT,
+        vehicle_wheelchair_accessible TEXT,
+    )
+    """,
+    'realtime_trip_stop_time_updates': """
+    CREATE TABLE IF NOT EXISTS realtime_trip_stop_time_updates
+    (
+        msg_id                TEXT NOT NULL,
+        stop_sequence         INTEGER,
+        stop_id               TEXT,
+        arrival_time          INTEGER,
+        arrival_delay         INTEGER,
+        arrival_uncertainty   INTEGER,
+        departure_time        INTEGER,
+        departure_delay       INTEGER,
+        departure_uncertainty INTEGER,
+        schedule_relationship TEXT
+    )
+    """,
+    'realtime_service_alerts': """
+    CREATE TABLE IF NOT EXISTS realtime_service_alerts
+    (
+        msg_id               TEXT NOT NULL,
+        cause                TEXT,
+        effect               TEXT,
+        url                  TEXT,
+        header_text          TEXT NOT NULL,
+        description_text     TEXT NOT NULL,
+        tts_header_text      TEXT,
+        tts_description_text TEXT,
+        severity_level       TEXT
+    )
+    """,
+    'realtime_alert_active_periods': """
+    CREATE TABLE IF NOT EXISTS realtime_alert_active_periods
+    (
+        msg_id TEXT NOT NULL,
+        start_timestamp  INTEGER,
+        end_timestamp    INTEGER
+    )
+    """,
+    'realtime_alert_informed_entities': """
+    CREATE TABLE IF NOT EXISTS realtime_alert_informed_entities
+    (
+        msg_id                     TEXT NOT NULL,
+        agency_id                  TEXT,
+        route_id                   TEXT,
+        route_type                 INTEGER,
+        trip_id                    TEXT,
+        trip_route_id              TEXT,
+        trip_direction_id          TEXT,
+        trip_start_time            TEXT,
+        trip_start_date            TEXT,
+        trip_schedule_relationship TEXT,
+        stop_id                    TEXT
     )
     """
 }

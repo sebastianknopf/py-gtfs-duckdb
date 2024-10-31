@@ -29,6 +29,20 @@ class GtfsLake:
 
         self._batch_size = 1000000
 
+        # generate realtime tables
+        realtime_tables = [
+            'realtime_service_alerts',
+            'realtime_alert_active_periods',
+            'realtime_alert_informed_entities',
+            'realtime_trip_updates',
+            'realtime_trip_stop_time_updates',
+            'realtime_vehicle_positions'
+        ]
+
+        for realtime_table in realtime_tables:
+            create_stmt = gtfslake.ddbdef.schema[realtime_table]
+            self._connection.execute(create_stmt)
+
     def load_static(self, gtfs_static_filename):
         with zipfile.ZipFile(gtfs_static_filename) as gtfs_static_file:
             for txt_filename in gtfs_static_file.namelist():
