@@ -183,7 +183,7 @@ schema = {
     'realtime_trip_updates': """
     CREATE TABLE IF NOT EXISTS realtime_trip_updates
     (
-        msg_id TEXT NOT NULL,
+        trip_update_id TEXT NOT NULL,
         trip_id TEXT,
         trip_route_id TEXT,
         trip_direction_id TEXT,
@@ -199,7 +199,7 @@ schema = {
     'realtime_trip_stop_time_updates': """
     CREATE TABLE IF NOT EXISTS realtime_trip_stop_time_updates
     (
-        msg_id                TEXT NOT NULL,
+        trip_update_id        TEXT NOT NULL,
         stop_sequence         INTEGER,
         stop_id               TEXT,
         arrival_time          INTEGER,
@@ -214,7 +214,7 @@ schema = {
     'realtime_service_alerts': """
     CREATE TABLE IF NOT EXISTS realtime_service_alerts
     (
-        msg_id               TEXT NOT NULL,
+        service_alert_id     TEXT NOT NULL,
         cause                TEXT,
         effect               TEXT,
         url                  TEXT,
@@ -228,7 +228,7 @@ schema = {
     'realtime_alert_active_periods': """
     CREATE TABLE IF NOT EXISTS realtime_alert_active_periods
     (
-        msg_id TEXT NOT NULL,
+        service_alert_id TEXT NOT NULL,
         start_timestamp  INTEGER,
         end_timestamp    INTEGER
     )
@@ -236,7 +236,7 @@ schema = {
     'realtime_alert_informed_entities': """
     CREATE TABLE IF NOT EXISTS realtime_alert_informed_entities
     (
-        msg_id                     TEXT NOT NULL,
+        service_alert_id           TEXT NOT NULL,
         agency_id                  TEXT,
         route_id                   TEXT,
         route_type                 INTEGER,
