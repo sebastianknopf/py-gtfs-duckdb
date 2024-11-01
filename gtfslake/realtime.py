@@ -58,65 +58,62 @@ class GtfsLakeRealtimeServer:
     async def _service_alerts(self, request: Request) -> Response:
         service_alerts, alert_active_periods, alert_informed_entities = self._lake.fetch_realtime_service_alerts()
 
-        feed_message = {
-            'header': {
-                'gtfs_realtime_version': '2.0',
-                'incrementality': 'FULL_DATASET',
-                'timestamp': '1653701655'
-            },
-            'entity': [
-                {
-                    'id': '47110815',
-                    'is_deleted': False,
-                    'alert': {
-                        'effect': 'OTHER_EFFECT',
-                        'cause': 'OTHER_CAUSE',
-                        'header_text': {
-                            'translation': [
-                                {
-                                    'text': 'Sample text',
-                                    'language': 'de'
-                                }
-                            ]
-                        },
-                        'description_text': {
-                            'translation': [
-                                {
-                                    'text': 'Longer sample text',
-                                    'language': 'de'
-                                }
-                            ]
-                        },
-                        'informed_entity': [
-                            {
-                                'route_type': 3
-                            },
-                            {
-                                'route_type': 1
-                            }
-                        ],
-                        'active_period': [
-							{
-                                'start': 1730332800,
-                                'end': 1711929599
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
-
+        objects = list()
         for service_alert in service_alerts.iter_rows(named=True):
-            print(service_alert['service_alert_id'])
+
+            obj = dict()
+            obj['id'] = service_alert['service_alert_id']
+
+            obj['alert'] = dict()
+            obj['alert']['cause'] = service_alert['cause']
+            obj['alert']['effect'] = service_alert['effect']
+
+            obj['alert']['header_text'] = dict()
+            obj['alert']['header_text']['translation'] = list()
+            obj['alert']['header_text']['translation'].append({
+                'text': service_alert['header_text'],
+                'language': 'de-DE'
+            })
+
+            obj['alert']['description_text'] = dict()
+            obj['alert']['description_text']['translation'] = list()
+            obj['alert']['description_text']['translation'].append({
+                'text': service_alert['description_text'],
+                'language': 'de-DE'
+            })
+
+            obj['alert']['active_period'] = list()
+            obj['alert']['informed_entity'] = list()
 
             for active_period in alert_active_periods.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
-                print(active_period['start_timestamp'])
+                obj['alert']['active_period'].append({
+                    'start': active_period['start_timestamp'],
+                    'end': active_period['end_timestamp']
+                })
 
             for informed_entity in alert_informed_entities.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
-                print(informed_entity['route_type'])
+                ie = dict()
+
+                if informed_entity['agency_id'] is not None:
+                    ie['agency_id'] = informed_entity['agency_id']
+
+                if informed_entity['route_id'] is not None:
+                    ie['route_id'] = informed_entity['route_id']    
+
+                if informed_entity['route_type'] is not None:
+                    ie['route_type'] = informed_entity['route_type']
+
+                if informed_entity['stop_id'] is not None:
+                    ie['stop_id'] = informed_entity['stop_id']    
+
+                # TODO: implement trip descriptor here ...
+                
+                obj['alert']['informed_entity'].append(ie)
+
+            objects.append(obj)
 
         # send response
-        # feed_message = self._create_feed_message(objects)
+        feed_message = self._create_feed_message(objects)
         if 'f' in request.query_params and request.query_params['f'] == 'json':
             return self._send_json_response(feed_message)
         else:
