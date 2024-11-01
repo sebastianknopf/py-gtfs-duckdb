@@ -1,15 +1,15 @@
 import json
 import polars as pl
-import time
 import yaml
 
+from datetime import datetime
 from fastapi import APIRouter
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi import Response
-
 from google.transit import gtfs_realtime_pb2
 from google.protobuf.json_format import ParseDict
+from math import floor
 
 from gtfslake.lake import GtfsLake
 
@@ -156,7 +156,7 @@ class GtfsLakeRealtimeServer:
             'header': {
                 'gtfs_realtime_version': '2.0',
                 'incrementality': 'FULL_DATASET',
-                'timestamp': time.time()
+                'timestamp': floor(datetime.utcnow().timestamp())
             },
             'entity': entities
         }
