@@ -1,7 +1,7 @@
 import click
 import uvicorn
 
-from gtfslake.implementation import GtfsLake
+from gtfslake.lake import GtfsLake
 from gtfslake.realtime import GtfsLakeRealtimeServer
 
 

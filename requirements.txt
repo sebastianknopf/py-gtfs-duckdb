@@ -2,6 +2,7 @@ click
 duckdb
 fastapi
 gtfs-realtime-bindings
+memcache
 polars
 protobuf
 pyarrow

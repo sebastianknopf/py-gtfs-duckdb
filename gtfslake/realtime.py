@@ -1,4 +1,6 @@
+import json
 import polars as pl
+import time
 import yaml
 
 from fastapi import APIRouter
@@ -9,14 +11,14 @@ from fastapi import Response
 from google.transit import gtfs_realtime_pb2
 from google.protobuf.json_format import ParseDict
 
-from gtfslake.implementation import GtfsLake
+from gtfslake.lake import GtfsLake
 
 class GtfsLakeRealtimeServer:
 
-    def __init__(self, database: str, config_filename: str|None):
+    def __init__(self, database_filename: str, config_filename: str|None):
 
 		# connect to GTFS lake database
-        self._lake = GtfsLake(database)
+        self._lake = GtfsLake(database_filename)
 
         # load config and set default values
         if config_filename is not None:
@@ -27,7 +29,9 @@ class GtfsLakeRealtimeServer:
         self._config['app'] = dict()
         self._config['app']['caching_enabled'] = False
         self._config['app']['caching_server_endpoint'] = ''
-        self._config['app']['caching_server_ttl_seconds'] = ''
+        self._config['app']['caching_service_alerts_ttl_seconds'] = 60
+        self._config['app']['caching_trip_updates_ttl_seconds'] = 30
+        self._config['app']['caching_vehicle_positions_ttl_seconds'] = 15
 
         self._config['app']['routing'] = dict()
         self._config['app']['routing']['service_alerts_endpoint'] = '/gtfs/realtime/service-alerts.pbf'
@@ -111,13 +115,36 @@ class GtfsLakeRealtimeServer:
             for informed_entity in alert_informed_entities.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
                 print(informed_entity['route_type'])
 
-        return Response(content=ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString(), media_type='application/protobuf') 
+        # send response
+        # feed_message = self._create_feed_message(objects)
+        if 'f' in request.query_params and request.query_params['f'] == 'json':
+            return self._send_json_response(feed_message)
+        else:
+            return self._send_pbf_response(feed_message)
 
     async def _trip_updates(self, request: Request) -> Response:
         return 'Test'
 
     async def _vehicle_positions(self, request: Request) -> Response:
         return 'Test'
+    
+    def _send_json_response(self, feed_message):
+        json_result = json.dumps(feed_message)
+        return Response(content=json_result, media_type='application/json')
+
+    def _send_pbf_response(self, feed_message):
+        pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
+        return Response(content=pbf_result, media_type='application/protobuf')
+    
+    def _create_feed_message(self, entities):
+        return {
+            'header': {
+                'gtfs_realtime_version': '2.0',
+                'incrementality': 'FULL_DATASET',
+                'timestamp': time.time()
+            },
+            'entity': entities
+        }
 
     def create(self):
         self._fastapi.include_router(self._api_router)
