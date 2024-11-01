@@ -56,6 +56,19 @@ class GtfsLakeRealtimeServer:
             self._cache = None
 
     async def _service_alerts(self, request: Request) -> Response:
+        
+        # check whether there're cached data
+        if self._cache is not None:
+            cached_response = self._cache.get(request.url.path)
+            if cached_response is not None:
+                if 'f' in request.query_params and request.query_params['f'] == 'json':
+                    mime_type = 'application/json'
+                else:
+                    mime_type = 'application/protobuf'
+                
+                return Response(content=cached_response, media_type=mime_type)
+        
+        # if there're no data cached, fetch and create them
         service_alerts, alert_active_periods, alert_informed_entities = self._lake.fetch_realtime_service_alerts()
 
         objects = list()
@@ -106,7 +119,10 @@ class GtfsLakeRealtimeServer:
                 if informed_entity['stop_id'] is not None:
                     ie['stop_id'] = informed_entity['stop_id']    
 
-                # TODO: implement trip descriptor here ...
+                # request trip descriptor, if None, there's no trip informed
+                trip_descriptor = self._create_trip_descriptor(informed_entity)
+                if trip_descriptor is not None:
+                    ie['trip'] = trip_descriptor
                 
                 obj['alert']['informed_entity'].append(ie)
 
@@ -115,23 +131,25 @@ class GtfsLakeRealtimeServer:
         # send response
         feed_message = self._create_feed_message(objects)
         if 'f' in request.query_params and request.query_params['f'] == 'json':
-            return self._send_json_response(feed_message)
+            json_result = json.dumps(feed_message)
+
+            if self._cache is not None:
+                self._cache.set(request.url.path, json_result, self._config['app']['caching_service_alerts_ttl_seconds'])
+
+            return Response(content=json_result, media_type='application/json')
         else:
-            return self._send_pbf_response(feed_message)
+            pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
+            
+            if self._cache is not None:
+                self._cache.set(request.url.path, pbf_result, self._config['app']['caching_service_alerts_ttl_seconds'])
+
+            return Response(content=pbf_result, media_type='application/protobuf')
 
     async def _trip_updates(self, request: Request) -> Response:
         return 'Test'
 
     async def _vehicle_positions(self, request: Request) -> Response:
-        return 'Test'
-    
-    def _send_json_response(self, feed_message):
-        json_result = json.dumps(feed_message)
-        return Response(content=json_result, media_type='application/json')
-
-    def _send_pbf_response(self, feed_message):
-        pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
-        return Response(content=pbf_result, media_type='application/protobuf')
+        return 'Test'        
     
     def _create_feed_message(self, entities):
         return {
@@ -142,6 +160,36 @@ class GtfsLakeRealtimeServer:
             },
             'entity': entities
         }
+
+    def _create_trip_descriptor(self, input):
+        trip_descriptor_fields = [
+            'trip_id', 'trip_route_id', 'trip_direction_id', 'trip_start_time', 'trip_start_date', 'trip_schedule_relationship'
+        ]
+
+        if None not in list(input[k] for k in trip_descriptor_fields):
+            trip_descriptor = dict()
+
+            if 'trip_id' in input.keys() and input['trip_id'] is not None:
+                trip_descriptor['trip_id'] = input['trip_id']
+
+            if 'trip_route_id' in input.keys() and input['trip_route_id'] is not None:
+                trip_descriptor['route_id'] = input['trip_route_id']
+
+            if 'trip_direction_id' in input.keys() and input['trip_direction_id'] is not None:
+                trip_descriptor['direction_id'] = input['trip_direction_id']
+
+            if 'trip_start_time' in input.keys() and input['trip_start_time'] is not None:
+                trip_descriptor['start_time'] = input['trip_start_time']
+
+            if 'trip_start_date' in input.keys() and input['trip_start_date'] is not None:
+                trip_descriptor['start_date'] = input['trip_start_date']
+
+            if 'trip_schedule_relationship' in input.keys() and input['trip_schedule_relationship'] is not None:
+                trip_descriptor['schedule_relationship'] = input['trip_schedule_relationship']
+
+            return trip_descriptor
+        else:
+            return None
 
     def create(self):
         self._fastapi.include_router(self._api_router)
