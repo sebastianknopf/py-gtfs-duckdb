@@ -162,11 +162,53 @@ class GtfsLakeRealtimeServer:
         trip_updates, trip_stop_time_updates = self._lake.fetch_realtime_trip_updates()
 
         objects = list()
-        for trip_update in trip_updates.pl().iter_rows(named=True):
+        for trip_update in trip_updates.iter_rows(named=True):
             obj = dict()
             obj['id'] = trip_update['trip_update_id']
 
+            obj['trip_update'] = dict()
 
+            trip_descriptor = self._create_trip_descriptor(trip_update)
+            if trip_descriptor is not None:
+                obj['trip_update']['trip'] = trip_descriptor
+
+            vehicle_descriptor = self._create_vehicle_descriptor(trip_update)
+            if vehicle_descriptor is not None:
+                obj['vehicle_descriptor']['vehicle'] = vehicle_descriptor
+
+            obj['trip_update']['stop_time_update'] = list()
+            for stop_time_update in trip_stop_time_updates.filter(pl.col('trip_update_id') == trip_update['trip_update_id']).iter_rows(named=True):
+                stu = dict()
+
+                if stop_time_update['stop_sequence'] is not None:
+                    stu['stop_sequence'] = stop_time_update['stop_sequence']
+
+                if stop_time_update['stop_id'] is not None:
+                    stu['stop_id'] = stop_time_update['stop_id']
+
+                # build arrival time update
+                if stop_time_update['arrival_time'] is not None:
+                    stu['arrival_time'] = stop_time_update['arrival_time']
+
+                if stop_time_update['arrival_delay'] is not None:
+                    stu['arrival_delay'] = stop_time_update['arrival_delay']
+
+                if stop_time_update['arrival_uncertainty'] is not None:
+                    stu['arrival_uncertainty'] = stop_time_update['arrival_uncertainty']
+
+                # build departure time update
+                if stop_time_update['departure_time'] is not None:
+                    stu['departure_time'] = stop_time_update['departure_time']
+
+                if stop_time_update['departure_delay'] is not None:
+                    stu['departure_delay'] = stop_time_update['departure_delay']
+
+                if stop_time_update['departure_uncertainty'] is not None:
+                    stu['departure_uncertainty'] = stop_time_update['departure_uncertainty']
+
+                stu['schedule_relationship'] = stop_time_update['schedule_relationship']
+
+                obj['trip_update']['stop_time_update'].append(stu)
 
             objects.append(obj)
 
@@ -205,11 +247,49 @@ class GtfsLakeRealtimeServer:
         vehicle_positions = self._lake.fetch_realtime_vehicle_positions()
 
         objects = list()
-        for vehicle_position in vehicle_positions.pl().iter_rows(named=True):
+        for vehicle_position in vehicle_positions.iter_rows(named=True):
             obj = dict()
             obj['id'] = vehicle_position['vehicle_position_id']
 
+            obj['vehicle_position'] = dict()
 
+            trip_descriptor = self._create_trip_descriptor(vehicle_position)
+            if trip_descriptor is not None:
+                obj['vehicle_position']['trip'] = trip_descriptor
+
+            vehicle_descriptor = self._create_vehicle_descriptor(vehicle_position)
+            if vehicle_descriptor is not None:
+                obj['vehicle_position']['vehicle'] = vehicle_descriptor
+
+            # extract position attributes
+            obj['vehicle_position']['position'] = dict()
+            obj['vehicle_position']['position']['latitude'] = vehicle_position['position_latitude']
+            obj['vehicle_position']['position']['longitude'] = vehicle_position['position_longitude']
+
+            if vehicle_position['position_bearing'] is not None:
+                obj['vehicle_position']['position']['bearing'] = vehicle_position['position_bearing']
+
+            if vehicle_position['position_odometer'] is not None:
+                obj['vehicle_position']['position']['odometer'] = vehicle_position['position_odometer']
+
+            if vehicle_position['position_speed'] is not None:
+                obj['vehicle_position']['position']['speed'] = vehicle_position['position_speed']
+
+            # extract remaining vehicle position parameters
+            if vehicle_position['current_stop_sequence'] is not None:
+                obj['vehicle_position']['current_stop_sequence'] = vehicle_position['current_stop_sequence']
+
+            if vehicle_position['stop_id'] is not None:
+                obj['vehicle_position']['stop_id'] = vehicle_position['stop_id']
+
+            if vehicle_position['current_status'] is not None:
+                obj['vehicle_position']['current_status'] = vehicle_position['current_status']
+
+            if vehicle_position['timestamp'] is not None:
+                obj['vehicle_position']['timestamp'] = vehicle_position['timestamp']
+
+            if vehicle_position['congestion_level'] is not None:
+                obj['vehicle_position']['congestion_level'] = vehicle_position['congestion_level']
 
             objects.append(obj)
 
@@ -245,7 +325,7 @@ class GtfsLakeRealtimeServer:
             'trip_id', 'trip_route_id', 'trip_direction_id', 'trip_start_time', 'trip_start_date', 'trip_schedule_relationship'
         ]
 
-        if None not in list(input[k] for k in trip_descriptor_fields):
+        if not all(e is None for e in list(input[k] for k in trip_descriptor_fields)):
             trip_descriptor = dict()
 
             if 'trip_id' in input.keys() and input['trip_id'] is not None:
@@ -267,6 +347,30 @@ class GtfsLakeRealtimeServer:
                 trip_descriptor['schedule_relationship'] = input['trip_schedule_relationship']
 
             return trip_descriptor
+        else:
+            return None
+
+    def _create_vehicle_descriptor(self, input):
+        vehicle_descriptor_fields = [
+            'vehicle_id', 'vehicle_label', 'vehicle_license_plate', 'vehicle_wheelchair_accessible'
+        ]
+
+        if not all(e is None for e in list(input[k] for k in vehicle_descriptor_fields)):
+            vehicle_descriptor = dict()
+
+            if 'vehicle_id' in input.keys() and input['vehicle_id'] is not None:
+                vehicle_descriptor['vehicle_id'] = input['vehicle_id']
+
+            if 'vehicle_label' in input.keys() and input['vehicle_label'] is not None:
+                vehicle_descriptor['vehicle_label'] = input['vehicle_label']
+
+            if 'vehicle_license_plate' in input.keys() and input['vehicle_license_plate'] is not None:
+                vehicle_descriptor['vehicle_license_plate'] = input['vehicle_license_plate']
+
+            if 'vehicle_wheelchair_accessible' in input.keys() and input['vehicle_wheelchair_accessible'] is not None:
+                vehicle_descriptor['vehicle_wheelchair_accessible'] = input['vehicle_wheelchair_accessible']
+
+            return vehicle_descriptor
         else:
             return None
 
