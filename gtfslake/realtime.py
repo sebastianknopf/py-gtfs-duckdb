@@ -187,24 +187,26 @@ class GtfsLakeRealtimeServer:
                     stu['stop_id'] = stop_time_update['stop_id']
 
                 # build arrival time update
+                stu['arrival'] = dict()
                 if stop_time_update['arrival_time'] is not None:
-                    stu['arrival_time'] = stop_time_update['arrival_time']
+                    stu['arrival']['time'] = stop_time_update['arrival_time']
 
                 if stop_time_update['arrival_delay'] is not None:
-                    stu['arrival_delay'] = stop_time_update['arrival_delay']
+                    stu['arrival']['delay'] = stop_time_update['arrival_delay']
 
                 if stop_time_update['arrival_uncertainty'] is not None:
-                    stu['arrival_uncertainty'] = stop_time_update['arrival_uncertainty']
+                    stu['arrival']['uncertainty'] = stop_time_update['arrival_uncertainty']
 
                 # build departure time update
+                stu['departure'] = dict()
                 if stop_time_update['departure_time'] is not None:
-                    stu['departure_time'] = stop_time_update['departure_time']
+                    stu['departure']['time'] = stop_time_update['departure_time']
 
                 if stop_time_update['departure_delay'] is not None:
-                    stu['departure_delay'] = stop_time_update['departure_delay']
+                    stu['departure']['delay'] = stop_time_update['departure_delay']
 
                 if stop_time_update['departure_uncertainty'] is not None:
-                    stu['departure_uncertainty'] = stop_time_update['departure_uncertainty']
+                    stu['departure']['uncertainty'] = stop_time_update['departure_uncertainty']
 
                 stu['schedule_relationship'] = stop_time_update['schedule_relationship']
 
@@ -251,45 +253,45 @@ class GtfsLakeRealtimeServer:
             obj = dict()
             obj['id'] = vehicle_position['vehicle_position_id']
 
-            obj['vehicle_position'] = dict()
+            obj['vehicle'] = dict()
 
             trip_descriptor = self._create_trip_descriptor(vehicle_position)
             if trip_descriptor is not None:
-                obj['vehicle_position']['trip'] = trip_descriptor
+                obj['vehicle']['trip'] = trip_descriptor
 
             vehicle_descriptor = self._create_vehicle_descriptor(vehicle_position)
             if vehicle_descriptor is not None:
-                obj['vehicle_position']['vehicle'] = vehicle_descriptor
+                obj['vehicle']['vehicle'] = vehicle_descriptor
 
             # extract position attributes
-            obj['vehicle_position']['position'] = dict()
-            obj['vehicle_position']['position']['latitude'] = vehicle_position['position_latitude']
-            obj['vehicle_position']['position']['longitude'] = vehicle_position['position_longitude']
+            obj['vehicle']['position'] = dict()
+            obj['vehicle']['position']['latitude'] = vehicle_position['position_latitude']
+            obj['vehicle']['position']['longitude'] = vehicle_position['position_longitude']
 
             if vehicle_position['position_bearing'] is not None:
-                obj['vehicle_position']['position']['bearing'] = vehicle_position['position_bearing']
+                obj['vehicle']['position']['bearing'] = vehicle_position['position_bearing']
 
             if vehicle_position['position_odometer'] is not None:
-                obj['vehicle_position']['position']['odometer'] = vehicle_position['position_odometer']
+                obj['vehicle']['position']['odometer'] = vehicle_position['position_odometer']
 
             if vehicle_position['position_speed'] is not None:
-                obj['vehicle_position']['position']['speed'] = vehicle_position['position_speed']
+                obj['vehicle']['position']['speed'] = vehicle_position['position_speed']
 
             # extract remaining vehicle position parameters
             if vehicle_position['current_stop_sequence'] is not None:
-                obj['vehicle_position']['current_stop_sequence'] = vehicle_position['current_stop_sequence']
+                obj['vehicle']['current_stop_sequence'] = vehicle_position['current_stop_sequence']
 
             if vehicle_position['stop_id'] is not None:
-                obj['vehicle_position']['stop_id'] = vehicle_position['stop_id']
+                obj['vehicle']['stop_id'] = vehicle_position['stop_id']
 
             if vehicle_position['current_status'] is not None:
-                obj['vehicle_position']['current_status'] = vehicle_position['current_status']
+                obj['vehicle']['current_status'] = vehicle_position['current_status']
 
             if vehicle_position['timestamp'] is not None:
-                obj['vehicle_position']['timestamp'] = vehicle_position['timestamp']
+                obj['vehicle']['timestamp'] = vehicle_position['timestamp']
 
             if vehicle_position['congestion_level'] is not None:
-                obj['vehicle_position']['congestion_level'] = vehicle_position['congestion_level']
+                obj['vehicle']['congestion_level'] = vehicle_position['congestion_level']
 
             objects.append(obj)
 
@@ -359,16 +361,16 @@ class GtfsLakeRealtimeServer:
             vehicle_descriptor = dict()
 
             if 'vehicle_id' in input.keys() and input['vehicle_id'] is not None:
-                vehicle_descriptor['vehicle_id'] = input['vehicle_id']
+                vehicle_descriptor['id'] = input['vehicle_id']
 
             if 'vehicle_label' in input.keys() and input['vehicle_label'] is not None:
-                vehicle_descriptor['vehicle_label'] = input['vehicle_label']
+                vehicle_descriptor['label'] = input['vehicle_label']
 
             if 'vehicle_license_plate' in input.keys() and input['vehicle_license_plate'] is not None:
-                vehicle_descriptor['vehicle_license_plate'] = input['vehicle_license_plate']
+                vehicle_descriptor['license_plate'] = input['vehicle_license_plate']
 
             if 'vehicle_wheelchair_accessible' in input.keys() and input['vehicle_wheelchair_accessible'] is not None:
-                vehicle_descriptor['vehicle_wheelchair_accessible'] = input['vehicle_wheelchair_accessible']
+                vehicle_descriptor['wheelchair_accessible'] = input['vehicle_wheelchair_accessible']
 
             return vehicle_descriptor
         else:
