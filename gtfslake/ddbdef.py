@@ -195,6 +195,7 @@ schema = {
         vehicle_label TEXT,
         vehicle_license_plate TEXT,
         vehicle_wheelchair_accessible TEXT,
+        timestamp INTEGER
     )
     """,
     'realtime_trip_stop_time_updates': """
