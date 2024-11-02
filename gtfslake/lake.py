@@ -111,6 +111,18 @@ class GtfsLake:
 
         return (service_alerts.pl(), alert_active_periods.pl(), alert_informed_entities.pl())
 
+    def fetch_realtime_trip_updates(self):
+
+        trip_updates = self._connection.table('realtime_trip_updates').select(duckdb.StarExpression())
+        trip_stop_time_updates = self._connection.table('realtime_trip_stop_time_updates').select(duckdb.StarExpression())
+
+        return (trip_updates, trip_stop_time_updates)
+
+    def fetch_realtime_vehicle_positions(self):
+        vehicle_positions = self._connection.table('realtime_vehicle_positions').select(duckdb.StarExpression())
+
+        return (vehicle_positions)
+
     def execute_sql(self, sqlfilename):
         with open(sqlfilename, 'r') as sql_file:
             sql_stmt = sql_file.read()

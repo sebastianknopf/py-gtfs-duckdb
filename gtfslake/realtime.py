@@ -56,7 +56,7 @@ class GtfsLakeRealtimeServer:
             self._cache = None
 
     async def _service_alerts(self, request: Request) -> Response:
-        
+
         # check whether there're cached data
         if self._cache is not None:
             cached_response = self._cache.get(request.url.path)
@@ -65,9 +65,9 @@ class GtfsLakeRealtimeServer:
                     mime_type = 'application/json'
                 else:
                     mime_type = 'application/protobuf'
-                
+
                 return Response(content=cached_response, media_type=mime_type)
-        
+
         # if there're no data cached, fetch and create them
         service_alerts, alert_active_periods, alert_informed_entities = self._lake.fetch_realtime_service_alerts()
 
@@ -117,13 +117,13 @@ class GtfsLakeRealtimeServer:
                     ie['route_type'] = informed_entity['route_type']
 
                 if informed_entity['stop_id'] is not None:
-                    ie['stop_id'] = informed_entity['stop_id']    
+                    ie['stop_id'] = informed_entity['stop_id']
 
                 # request trip descriptor, if None, there's no trip informed
                 trip_descriptor = self._create_trip_descriptor(informed_entity)
                 if trip_descriptor is not None:
                     ie['trip'] = trip_descriptor
-                
+
                 obj['alert']['informed_entity'].append(ie)
 
             objects.append(obj)
@@ -139,18 +139,97 @@ class GtfsLakeRealtimeServer:
             return Response(content=json_result, media_type='application/json')
         else:
             pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
-            
+
             if self._cache is not None:
                 self._cache.set(request.url.path, pbf_result, self._config['app']['caching_service_alerts_ttl_seconds'])
 
             return Response(content=pbf_result, media_type='application/protobuf')
 
     async def _trip_updates(self, request: Request) -> Response:
-        return 'Test'
+
+        # check whether there're cached data
+        if self._cache is not None:
+            cached_response = self._cache.get(request.url.path)
+            if cached_response is not None:
+                if 'f' in request.query_params and request.query_params['f'] == 'json':
+                    mime_type = 'application/json'
+                else:
+                    mime_type = 'application/protobuf'
+
+                return Response(content=cached_response, media_type=mime_type)
+
+        # if nothing is cached, fetch trip updates
+        trip_updates, trip_stop_time_updates = self._lake.fetch_realtime_trip_updates()
+
+        objects = list()
+        for trip_update in trip_updates.pl().iter_rows(named=True):
+            obj = dict()
+            obj['id'] = trip_update['trip_update_id']
+
+
+
+            objects.append(obj)
+
+        # send response
+        feed_message = self._create_feed_message(objects)
+        if 'f' in request.query_params and request.query_params['f'] == 'json':
+            json_result = json.dumps(feed_message)
+
+            if self._cache is not None:
+                self._cache.set(request.url.path, json_result, self._config['app']['caching_trip_updates_ttl_seconds'])
+
+            return Response(content=json_result, media_type='application/json')
+        else:
+            pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
+
+            if self._cache is not None:
+                self._cache.set(request.url.path, pbf_result, self._config['app']['caching_trip_updates_ttl_seconds'])
+
+            return Response(content=pbf_result, media_type='application/protobuf')
+
 
     async def _vehicle_positions(self, request: Request) -> Response:
-        return 'Test'        
-    
+
+        # check whether there're cached data
+        if self._cache is not None:
+            cached_response = self._cache.get(request.url.path)
+            if cached_response is not None:
+                if 'f' in request.query_params and request.query_params['f'] == 'json':
+                    mime_type = 'application/json'
+                else:
+                    mime_type = 'application/protobuf'
+
+                return Response(content=cached_response, media_type=mime_type)
+
+        # if nothing is cached, fetch trip updates
+        vehicle_positions = self._lake.fetch_realtime_vehicle_positions()
+
+        objects = list()
+        for vehicle_position in vehicle_positions.pl().iter_rows(named=True):
+            obj = dict()
+            obj['id'] = vehicle_position['vehicle_position_id']
+
+
+
+            objects.append(obj)
+
+        # send response
+        feed_message = self._create_feed_message(objects)
+        if 'f' in request.query_params and request.query_params['f'] == 'json':
+            json_result = json.dumps(feed_message)
+
+            if self._cache is not None:
+                self._cache.set(request.url.path, json_result, self._config['app']['caching_vehicle_positions_ttl_seconds'])
+
+            return Response(content=json_result, media_type='application/json')
+        else:
+            pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
+
+            if self._cache is not None:
+                self._cache.set(request.url.path, pbf_result, self._config['app']['caching_vehicle_positions_ttl_seconds'])
+
+            return Response(content=pbf_result, media_type='application/protobuf')
+
     def _create_feed_message(self, entities):
         return {
             'header': {
