@@ -174,7 +174,7 @@ schema = {
         position_bearing              FLOAT,
         position_odometer             FLOAT,
         position_speed                FLOAT,
-        current_stop_status           INTEGER,
+        current_stop_sequence         INTEGER,
         stop_id                       TEXT,
         current_status                TEXT,
         timestamp                     INTEGER,
