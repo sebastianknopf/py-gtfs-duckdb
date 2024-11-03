@@ -17,8 +17,8 @@ class GtfsLakeRealtimeServer:
 
     def __init__(self, database_filename: str, config_filename: str|None):
 
-		# connect to GTFS lake database
-        self._lake = GtfsLake(database_filename)
+		# connect to GTFS lake database in read-only mode
+        self._lake = GtfsLake(database_filename, True)
 
         # load config and set default values
         if config_filename is not None:

@@ -11,8 +11,8 @@ import gtfslake.ddbdef
 
 class GtfsLake:
 
-    def __init__(self, database_filename):
-        self._connection = duckdb.connect(database_filename)
+    def __init__(self, database_filename, read_only=False):
+        self._connection = duckdb.connect(database_filename, read_only)
 
         self._tables = [
             'agency',
@@ -29,19 +29,20 @@ class GtfsLake:
 
         self._batch_size = 1000000
 
-        # generate realtime tables
-        self.realtime_tables = [
-            'realtime_service_alerts',
-            'realtime_alert_active_periods',
-            'realtime_alert_informed_entities',
-            'realtime_trip_updates',
-            'realtime_trip_stop_time_updates',
-            'realtime_vehicle_positions'
-        ]
+        if not read_only:
+            # generate realtime tables
+            self.realtime_tables = [
+                'realtime_service_alerts',
+                'realtime_alert_active_periods',
+                'realtime_alert_informed_entities',
+                'realtime_trip_updates',
+                'realtime_trip_stop_time_updates',
+                'realtime_vehicle_positions'
+            ]
 
-        for realtime_table in self.realtime_tables:
-            create_stmt = gtfslake.ddbdef.schema[realtime_table]
-            self._connection.execute(create_stmt)
+            for realtime_table in self.realtime_tables:
+                create_stmt = gtfslake.ddbdef.schema[realtime_table]
+                self._connection.execute(create_stmt)
 
     def load_static(self, gtfs_static_filename):
         with zipfile.ZipFile(gtfs_static_filename) as gtfs_static_file:
@@ -116,12 +117,12 @@ class GtfsLake:
         trip_updates = self._connection.table('realtime_trip_updates').select(duckdb.StarExpression())
         trip_stop_time_updates = self._connection.table('realtime_trip_stop_time_updates').select(duckdb.StarExpression())
 
-        return (trip_updates, trip_stop_time_updates)
+        return (trip_updates.pl(), trip_stop_time_updates.pl())
 
     def fetch_realtime_vehicle_positions(self):
         vehicle_positions = self._connection.table('realtime_vehicle_positions').select(duckdb.StarExpression())
 
-        return (vehicle_positions)
+        return (vehicle_positions.pl())
 
     def execute_sql(self, sqlfilename):
         with open(sqlfilename, 'r') as sql_file:
