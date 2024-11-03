@@ -68,8 +68,8 @@ def sql(database, files):
 
 @cli.command()
 @click.argument('database')
-@click.option('--host', '-h', help='Host to run the realtime server')
-@click.option('--port', '-p', help='Port to run the realtime server')
+@click.option('--host', '-h', default='0.0.0.0', help='Host to run the realtime server')
+@click.option('--port', '-p', default='8030', help='Port to run the realtime server')
 @click.option('--config', '-c', default=None, help='Additional configuration file for realtime server')
 def realtime(database, config, host, port):
 
