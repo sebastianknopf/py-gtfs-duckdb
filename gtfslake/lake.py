@@ -14,7 +14,9 @@ class GtfsLake:
     def __init__(self, database_filename, read_only=False):
         self._connection = duckdb.connect(database_filename, read_only)
 
-        self._tables = [
+        self._batch_size = 1000000
+
+        self.static_tables = [
             'agency',
             'calendar_dates',
             'calendar',
@@ -27,19 +29,22 @@ class GtfsLake:
             'trips'
         ]
 
-        self._batch_size = 1000000
+        self.realtime_tables = [
+            'realtime_service_alerts',
+            'realtime_alert_active_periods',
+            'realtime_alert_informed_entities',
+            'realtime_trip_updates',
+            'realtime_trip_stop_time_updates',
+            'realtime_vehicle_positions'
+        ]
 
         if not read_only:
-            # generate realtime tables
-            self.realtime_tables = [
-                'realtime_service_alerts',
-                'realtime_alert_active_periods',
-                'realtime_alert_informed_entities',
-                'realtime_trip_updates',
-                'realtime_trip_stop_time_updates',
-                'realtime_vehicle_positions'
-            ]
+            # generate static tables
+            for static_table in self.static_tables:
+                create_stmt = gtfslake.ddbdef.schema[static_table]
+                self._connection.execute(create_stmt)
 
+            # generate realtime tables
             for realtime_table in self.realtime_tables:
                 create_stmt = gtfslake.ddbdef.schema[realtime_table]
                 self._connection.execute(create_stmt)
@@ -47,7 +52,7 @@ class GtfsLake:
     def load_static(self, gtfs_static_filename):
         with zipfile.ZipFile(gtfs_static_filename) as gtfs_static_file:
             for txt_filename in gtfs_static_file.namelist():
-                if txt_filename.replace('.txt', '') in self._tables:
+                if txt_filename.replace('.txt', '') in self.static_tables:
                     with io.TextIOWrapper(gtfs_static_file.open(txt_filename), encoding='utf-8') as txt_file:
                         self._load_txt_file(txt_file, txt_filename.replace('.txt', ''))
 
@@ -76,8 +81,8 @@ class GtfsLake:
         strategy.run(self._connection, subset, self._tables)
 
     def export_static(self, output, tmpdir=tempfile.gettempdir()):
-        if os.path.exists(output):
-            for tbl in self._tables:
+        if os.path.isdir(output):
+            for tbl in self.static_tables:
                 filename = os.path.join(output, f"{tbl}.txt")
                 self._connection.sql(f"SELECT * FROM {tbl}").write_csv(filename, sep=',')
 
@@ -86,7 +91,7 @@ class GtfsLake:
 
             try:
                 # export all tables to temporary txt files
-                for tbl in self._tables:
+                for tbl in self.static_tables:
                     with tempfile.NamedTemporaryFile(delete=False) as tmp:
                         filename = tmp.name
                         tmp_files[f"{tbl}.txt"] = filename
@@ -134,6 +139,10 @@ class GtfsLake:
         self._connection.execute('DELETE FROM routes WHERE agency_id NOT IN (SELECT agency_id FROM agency)')
         self._connection.execute('DELETE FROM trips WHERE route_id NOT IN (SELECT route_id FROM routes)')
         self._connection.execute('DELETE FROM stop_times WHERE trip_id NOT IN (SELECT trip_id FROM trips)')
+        
+        self._connection.execute('DELETE FROM stops WHERE (location_type = \'0\' OR location_type = \'\') AND stop_id NOT IN (SELECT stop_id FROM stop_times)')
+        self._connection.execute('DELETE FROM stops WHERE location_type = \'1\' AND stop_id NOT IN (SELECT parent_station FROM stops)')
+
         self._connection.execute('DELETE FROM shapes WHERE shape_id NOT IN (SELECT shape_id FROM trips)')
         self._connection.execute('DELETE FROM transfers WHERE from_route_id NOT IN (SELECT route_id FROM routes) OR to_route_id NOT IN (SELECT route_id FROM routes)')
         self._connection.execute('DELETE FROM transfers WHERE from_trip_id NOT IN (SELECT trip_id FROM trips) OR to_trip_id NOT IN (SELECT trip_id FROM trips)')
@@ -142,17 +151,13 @@ class GtfsLake:
 
     def _load_txt_file(self, txt_file, table_name):
 
-        # run create statement to ensure destination table exists
-        create_stmt = gtfslake.ddbdef.schema[table_name]
-        self._connection.execute(create_stmt)
-        
         # load existing headers of table, keep track of all header indices which exist in the TXT file but not in the DDB table
         existing_headers = list()
         hdr_index_blacklist = list()
         for record in self._connection.execute(f"DESCRIBE {table_name}").pl().iter_rows(named=True):
             existing_headers.append(record['column_name'])
 
-        # open reader on TXT file        
+        # open reader on TXT file
         headers = list()
         records = list()
 
@@ -170,14 +175,14 @@ class GtfsLake:
                         record.append(rec)
 
                 records.append(record)
-            
+
             # insert if batch size was reached
-            if len(records) >= self._batch_size:            
+            if len(records) >= self._batch_size:
                 df = polars.DataFrame(records, schema=headers, orient='row')
                 self._connection.execute(f"INSERT INTO {table_name} ({','.join(headers)}) SELECT * FROM df")
                 records = list()
-        
+
         df = polars.DataFrame(records, schema=headers, orient='row')
         self._connection.execute(f"INSERT INTO {table_name} ({','.join(headers)}) SELECT * FROM df")
         records = list()
-        
+
