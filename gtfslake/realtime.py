@@ -24,19 +24,19 @@ class GtfsLakeRealtimeServer:
         if config_filename is not None:
             with open(config_filename, 'r') as config_file:
                 self._config = yaml.safe_load(config_file)
+        else:
+            self._config = dict()
+            self._config['app'] = dict()
+            self._config['app']['caching_enabled'] = False
+            self._config['app']['caching_server_endpoint'] = ''
+            self._config['app']['caching_service_alerts_ttl_seconds'] = 60
+            self._config['app']['caching_trip_updates_ttl_seconds'] = 30
+            self._config['app']['caching_vehicle_positions_ttl_seconds'] = 15
 
-        self._config = dict()
-        self._config['app'] = dict()
-        self._config['app']['caching_enabled'] = False
-        self._config['app']['caching_server_endpoint'] = ''
-        self._config['app']['caching_service_alerts_ttl_seconds'] = 60
-        self._config['app']['caching_trip_updates_ttl_seconds'] = 30
-        self._config['app']['caching_vehicle_positions_ttl_seconds'] = 15
-
-        self._config['app']['routing'] = dict()
-        self._config['app']['routing']['service_alerts_endpoint'] = '/gtfs/realtime/service-alerts.pbf'
-        self._config['app']['routing']['trip_updates_endpoint'] = '/gtfs/realtime/trip-updates.pbf'
-        self._config['app']['routing']['vehicle_positions_endpoint'] = '/gtfs/realtime/vehicle-positions.pbf'
+            self._config['app']['routing'] = dict()
+            self._config['app']['routing']['service_alerts_endpoint'] = '/gtfs/realtime/service-alerts.pbf'
+            self._config['app']['routing']['trip_updates_endpoint'] = '/gtfs/realtime/trip-updates.pbf'
+            self._config['app']['routing']['vehicle_positions_endpoint'] = '/gtfs/realtime/vehicle-positions.pbf'
 
         # create routes
         self._fastapi = FastAPI()
