@@ -70,10 +70,11 @@ class GtfsLakeRealtimeServer:
     async def _service_alerts(self, request: Request) -> Response:
 
         # check whether there're cached data
+        format = request.query_params['f'] if 'f' in request.query_params else 'pbf'
         if self._cache is not None:
-            cached_response = self._cache.get(request.url.path)
+            cached_response = self._cache.get(f"{request.url.path}-{format}")
             if cached_response is not None:
-                if 'f' in request.query_params and request.query_params['f'] == 'json':
+                if format == 'json':
                     mime_type = 'application/json'
                 else:
                     mime_type = 'application/octet-stream'
@@ -142,26 +143,27 @@ class GtfsLakeRealtimeServer:
 
         # send response
         feed_message = self._create_feed_message(objects)
-        if 'f' in request.query_params and request.query_params['f'] == 'json':
+        if format  == 'json':
             json_result = json.dumps(feed_message)
 
             if self._cache is not None:
-                self._cache.set(request.url.path, json_result, self._config['caching']['caching_service_alerts_ttl_seconds'])
+                self._cache.set(f"{request.url.path}-{format}", json_result, self._config['caching']['caching_service_alerts_ttl_seconds'])
 
             return Response(content=json_result, media_type='application/json')
         else:
             pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
 
             if self._cache is not None:
-                self._cache.set(request.url.path, pbf_result, self._config['caching']['caching_service_alerts_ttl_seconds'])
+                self._cache.set(f"{request.url.path}-{format}", pbf_result, self._config['caching']['caching_service_alerts_ttl_seconds'])
 
             return Response(content=pbf_result, media_type='application/octet-stream')
 
     async def _trip_updates(self, request: Request) -> Response:
 
         # check whether there're cached data
+        format = request.query_params['f'] if 'f' in request.query_params else 'pbf'
         if self._cache is not None:
-            cached_response = self._cache.get(request.url.path)
+            cached_response = self._cache.get(f"{request.url.path}-{format}")
             if cached_response is not None:
                 if 'f' in request.query_params and request.query_params['f'] == 'json':
                     mime_type = 'application/json'
@@ -228,18 +230,18 @@ class GtfsLakeRealtimeServer:
 
         # send response
         feed_message = self._create_feed_message(objects)
-        if 'f' in request.query_params and request.query_params['f'] == 'json':
+        if format  == 'json':
             json_result = json.dumps(feed_message)
 
             if self._cache is not None:
-                self._cache.set(request.url.path, json_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
+                self._cache.set(f"{request.url.path}-{format}", json_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
 
             return Response(content=json_result, media_type='application/json')
         else:
             pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
 
             if self._cache is not None:
-                self._cache.set(request.url.path, pbf_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
+                self._cache.set(f"{request.url.path}-{format}", pbf_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
 
             return Response(content=pbf_result, media_type='application/octet-stream')
 
@@ -247,8 +249,9 @@ class GtfsLakeRealtimeServer:
     async def _vehicle_positions(self, request: Request) -> Response:
 
         # check whether there're cached data
+        format = request.query_params['f'] if 'f' in request.query_params else 'pbf'
         if self._cache is not None:
-            cached_response = self._cache.get(request.url.path)
+            cached_response = self._cache.get(f"{request.url.path}-{format}")
             if cached_response is not None:
                 if 'f' in request.query_params and request.query_params['f'] == 'json':
                     mime_type = 'application/json'
@@ -309,18 +312,18 @@ class GtfsLakeRealtimeServer:
 
         # send response
         feed_message = self._create_feed_message(objects)
-        if 'f' in request.query_params and request.query_params['f'] == 'json':
+        if format  == 'json':
             json_result = json.dumps(feed_message)
 
             if self._cache is not None:
-                self._cache.set(request.url.path, json_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
+                self._cache.set(f"{request.url.path}-{format}", json_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
 
             return Response(content=json_result, media_type='application/json')
         else:
             pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
 
             if self._cache is not None:
-                self._cache.set(request.url.path, pbf_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
+                self._cache.set(f"{request.url.path}-{format}", pbf_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
 
             return Response(content=pbf_result, media_type='application/octet-stream')
 
