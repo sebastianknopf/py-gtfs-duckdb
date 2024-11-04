@@ -11,8 +11,8 @@ import gtfslake.ddbdef
 
 class GtfsLake:
 
-    def __init__(self, database_filename, read_only=False):
-        self._connection = duckdb.connect(database_filename, read_only)
+    def __init__(self, database_filename, read_only_flag=False):
+        self._connection = duckdb.connect(database=database_filename, read_only=read_only_flag)
 
         self._batch_size = 1000000
 
@@ -38,7 +38,7 @@ class GtfsLake:
             'realtime_vehicle_positions'
         ]
 
-        if not read_only:
+        if not read_only_flag:
             # generate static tables
             for static_table in self.static_tables:
                 create_stmt = gtfslake.ddbdef.schema[static_table]

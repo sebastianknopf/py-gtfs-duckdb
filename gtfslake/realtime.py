@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi import Response
+from fastapi.middleware.cors import CORSMiddleware
 from google.transit import gtfs_realtime_pb2
 from google.protobuf.json_format import ParseDict
 from math import floor
@@ -17,8 +18,8 @@ class GtfsLakeRealtimeServer:
 
     def __init__(self, database_filename: str, config_filename: str|None):
 
-		# connect to GTFS lake database in read-only mode
-        self._lake = GtfsLake(database_filename, True)
+		# connect to GTFS lake database
+        self._lake = GtfsLake(database_filename)
 
         # load config and set default values
         if config_filename is not None:
@@ -28,6 +29,7 @@ class GtfsLakeRealtimeServer:
             self._config = dict()
             self._config['app'] = dict()
             self._config['app']['caching_enabled'] = False
+            self._config['app']['cors_enabled'] = False
 
             self._config['app']['routing'] = dict()
             self._config['app']['routing']['service_alerts_endpoint'] = '/gtfs/realtime/service-alerts.pbf'
@@ -47,6 +49,16 @@ class GtfsLakeRealtimeServer:
         self._api_router.add_api_route(self._config['app']['routing']['trip_updates_endpoint'], endpoint=self._trip_updates, methods=['GET'], name='trip_updates')
         self._api_router.add_api_route(self._config['app']['routing']['vehicle_positions_endpoint'], endpoint=self._vehicle_positions, methods=['GET'], name='vehicle_positions')
 
+        # add CORS features if enabled in config
+        if self._config['app']['cors_enabled']:
+            self._fastapi.add_middleware(
+                CORSMiddleware,
+                allow_origins=['*'],
+                allow_credentials=True,
+                allow_methods=['GET'],
+                allow_headers=['*']
+            )
+
         # enable chaching if configured
         if 'caching_enabled' in self._config['app'] and self._config['app']['caching_enabled'] == True:
             import memcache
@@ -64,7 +76,7 @@ class GtfsLakeRealtimeServer:
                 if 'f' in request.query_params and request.query_params['f'] == 'json':
                     mime_type = 'application/json'
                 else:
-                    mime_type = 'application/protobuf'
+                    mime_type = 'application/octet-stream'
 
                 return Response(content=cached_response, media_type=mime_type)
 
@@ -143,7 +155,7 @@ class GtfsLakeRealtimeServer:
             if self._cache is not None:
                 self._cache.set(request.url.path, pbf_result, self._config['caching']['caching_service_alerts_ttl_seconds'])
 
-            return Response(content=pbf_result, media_type='application/protobuf')
+            return Response(content=pbf_result, media_type='application/octet-stream')
 
     async def _trip_updates(self, request: Request) -> Response:
 
@@ -154,7 +166,7 @@ class GtfsLakeRealtimeServer:
                 if 'f' in request.query_params and request.query_params['f'] == 'json':
                     mime_type = 'application/json'
                 else:
-                    mime_type = 'application/protobuf'
+                    mime_type = 'application/octet-stream'
 
                 return Response(content=cached_response, media_type=mime_type)
 
@@ -229,7 +241,7 @@ class GtfsLakeRealtimeServer:
             if self._cache is not None:
                 self._cache.set(request.url.path, pbf_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
 
-            return Response(content=pbf_result, media_type='application/protobuf')
+            return Response(content=pbf_result, media_type='application/octet-stream')
 
 
     async def _vehicle_positions(self, request: Request) -> Response:
@@ -241,7 +253,7 @@ class GtfsLakeRealtimeServer:
                 if 'f' in request.query_params and request.query_params['f'] == 'json':
                     mime_type = 'application/json'
                 else:
-                    mime_type = 'application/protobuf'
+                    mime_type = 'application/octet-stream'
 
                 return Response(content=cached_response, media_type=mime_type)
 
@@ -310,7 +322,7 @@ class GtfsLakeRealtimeServer:
             if self._cache is not None:
                 self._cache.set(request.url.path, pbf_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
 
-            return Response(content=pbf_result, media_type='application/protobuf')
+            return Response(content=pbf_result, media_type='application/octet-stream')
 
     def _create_feed_message(self, entities):
         return {
