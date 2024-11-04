@@ -78,7 +78,7 @@ class GtfsLake:
         subset = duckdb.connect(subset_filename)
 
         strategy = importlib.import_module(f"gtfslake.strategy.{strategy_name}")
-        strategy.run(self._connection, subset, self._tables)
+        strategy.run(self._connection, subset, self.static_tables)
 
     def export_static(self, output, tmpdir=tempfile.gettempdir()):
         if os.path.isdir(output):

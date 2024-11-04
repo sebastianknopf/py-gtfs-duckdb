@@ -2,9 +2,9 @@ click
 duckdb
 fastapi
 gtfs-realtime-bindings
-memcache
 polars
 protobuf
 pyarrow
+python-memcached
 pyyaml
 uvicorn

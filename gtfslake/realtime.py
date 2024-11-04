@@ -28,15 +28,16 @@ class GtfsLakeRealtimeServer:
             self._config = dict()
             self._config['app'] = dict()
             self._config['app']['caching_enabled'] = False
-            self._config['app']['caching_server_endpoint'] = ''
-            self._config['app']['caching_service_alerts_ttl_seconds'] = 60
-            self._config['app']['caching_trip_updates_ttl_seconds'] = 30
-            self._config['app']['caching_vehicle_positions_ttl_seconds'] = 15
 
             self._config['app']['routing'] = dict()
             self._config['app']['routing']['service_alerts_endpoint'] = '/gtfs/realtime/service-alerts.pbf'
             self._config['app']['routing']['trip_updates_endpoint'] = '/gtfs/realtime/trip-updates.pbf'
             self._config['app']['routing']['vehicle_positions_endpoint'] = '/gtfs/realtime/vehicle-positions.pbf'
+
+            self._config['caching']['caching_server_endpoint'] = ''
+            self._config['caching']['caching_service_alerts_ttl_seconds'] = 60
+            self._config['caching']['caching_trip_updates_ttl_seconds'] = 30
+            self._config['caching']['caching_vehicle_positions_ttl_seconds'] = 15
 
         # create routes
         self._fastapi = FastAPI()
@@ -51,7 +52,6 @@ class GtfsLakeRealtimeServer:
             import memcache
 
             self._cache = memcache.Client([self._config['caching']['caching_server_endpoint']], debug=0)
-            self._cache_ttl = self._config['caching']['caching_server_ttl_seconds']
         else:
             self._cache = None
 
@@ -134,14 +134,14 @@ class GtfsLakeRealtimeServer:
             json_result = json.dumps(feed_message)
 
             if self._cache is not None:
-                self._cache.set(request.url.path, json_result, self._config['app']['caching_service_alerts_ttl_seconds'])
+                self._cache.set(request.url.path, json_result, self._config['caching']['caching_service_alerts_ttl_seconds'])
 
             return Response(content=json_result, media_type='application/json')
         else:
             pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
 
             if self._cache is not None:
-                self._cache.set(request.url.path, pbf_result, self._config['app']['caching_service_alerts_ttl_seconds'])
+                self._cache.set(request.url.path, pbf_result, self._config['caching']['caching_service_alerts_ttl_seconds'])
 
             return Response(content=pbf_result, media_type='application/protobuf')
 
@@ -220,14 +220,14 @@ class GtfsLakeRealtimeServer:
             json_result = json.dumps(feed_message)
 
             if self._cache is not None:
-                self._cache.set(request.url.path, json_result, self._config['app']['caching_trip_updates_ttl_seconds'])
+                self._cache.set(request.url.path, json_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
 
             return Response(content=json_result, media_type='application/json')
         else:
             pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
 
             if self._cache is not None:
-                self._cache.set(request.url.path, pbf_result, self._config['app']['caching_trip_updates_ttl_seconds'])
+                self._cache.set(request.url.path, pbf_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
 
             return Response(content=pbf_result, media_type='application/protobuf')
 
@@ -301,14 +301,14 @@ class GtfsLakeRealtimeServer:
             json_result = json.dumps(feed_message)
 
             if self._cache is not None:
-                self._cache.set(request.url.path, json_result, self._config['app']['caching_vehicle_positions_ttl_seconds'])
+                self._cache.set(request.url.path, json_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
 
             return Response(content=json_result, media_type='application/json')
         else:
             pbf_result = ParseDict(feed_message, gtfs_realtime_pb2.FeedMessage()).SerializeToString()
 
             if self._cache is not None:
-                self._cache.set(request.url.path, pbf_result, self._config['app']['caching_vehicle_positions_ttl_seconds'])
+                self._cache.set(request.url.path, pbf_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
 
             return Response(content=pbf_result, media_type='application/protobuf')
 
