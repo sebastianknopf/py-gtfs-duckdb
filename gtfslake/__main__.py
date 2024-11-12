@@ -74,7 +74,6 @@ def sql(database, files):
 def realtime(database, config, host, port):
 
     realtime = GtfsLakeRealtimeServer(database, config)
-
     uvicorn.run(app=realtime.create(), host=host, port=int(port))
 
 if __name__ == '__main__':

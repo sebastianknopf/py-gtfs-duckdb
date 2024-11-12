@@ -1,18 +1,31 @@
 import json
+import logging
 import polars as pl
 import yaml
 
+from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import APIRouter
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_mqtt import FastMQTT, MQTTConfig
+from gmqtt import Client as MQTTClient
 from google.transit import gtfs_realtime_pb2
 from google.protobuf.json_format import ParseDict
 from math import floor
+from typing import Any
 
 from gtfslake.lake import GtfsLake
+
+mqtt_config = MQTTConfig(
+            host='test.mosquitto.org',
+            port=1883,
+            keepalive=60
+        )
+
+mqtt = FastMQTT(config=mqtt_config)
 
 class GtfsLakeRealtimeServer:
 
@@ -42,7 +55,7 @@ class GtfsLakeRealtimeServer:
             self._config['caching']['caching_vehicle_positions_ttl_seconds'] = 15
 
         # create routes
-        self._fastapi = FastAPI()
+        self._fastapi = FastAPI(lifespan=self._lifespan)
         self._api_router = APIRouter()
 
         self._api_router.add_api_route(self._config['app']['routing']['service_alerts_endpoint'], endpoint=self._service_alerts, methods=['GET'], name='service_alerts')
@@ -66,6 +79,40 @@ class GtfsLakeRealtimeServer:
             self._cache = memcache.Client([self._config['caching']['caching_server_endpoint']], debug=0)
         else:
             self._cache = None
+
+        # enable MQTT connector for realtime data input
+        """mqtt_config = MQTTConfig(
+            host='test.mosquitto.org',
+            port=1883,
+            keepalive=60
+        )
+
+        self._mqtt = FastMQTT(config=mqtt_config)"""
+
+    @asynccontextmanager
+    async def _lifespan(self, app):
+        await mqtt.mqtt_startup()
+        yield
+        await mqtt.mqtt_shutdown()
+
+    @mqtt.on_connect()
+    def _mqtt_connect(client: MQTTClient, flags: int, rc: int, properties: Any):
+        l = logging.getLogger('uvicorn')
+        l.info('Connected ...')
+
+        client.subscribe('some/sample/topic')
+
+        l.info('Subscribed ...')
+
+    @mqtt.on_message()
+    async def _mqtt_message(client: MQTTClient, topic: str, payload: bytes, qos: int, properties: Any):
+        l = logging.getLogger('uvicorn')
+        l.info('Received ' + topic + ': ' + str(payload))
+
+    @mqtt.on_disconnect()
+    def _mqtt_disconnect(client: MQTTClient, packet, exc=None):
+        l = logging.getLogger('uvicorn')
+        l.info('Disconnected ...')
 
     async def _service_alerts(self, request: Request) -> Response:
 

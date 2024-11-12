@@ -1,6 +1,7 @@
 click
 duckdb
 fastapi
+fastapi-mqtt
 gtfs-realtime-bindings
 polars
 protobuf
