@@ -10,22 +10,13 @@ from fastapi import FastAPI
 from fastapi import Request
 from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi_mqtt import FastMQTT, MQTTConfig
-from gmqtt import Client as MQTTClient
 from google.transit import gtfs_realtime_pb2
 from google.protobuf.json_format import ParseDict
 from math import floor
+from paho.mqtt import client
 from typing import Any
 
 from gtfslake.lake import GtfsLake
-
-mqtt_config = MQTTConfig(
-            host='test.mosquitto.org',
-            port=1883,
-            keepalive=60
-        )
-
-mqtt = FastMQTT(config=mqtt_config)
 
 class GtfsLakeRealtimeServer:
 
@@ -54,6 +45,10 @@ class GtfsLakeRealtimeServer:
             self._config['caching']['caching_trip_updates_ttl_seconds'] = 30
             self._config['caching']['caching_vehicle_positions_ttl_seconds'] = 15
 
+        # create data notification client
+        self._mqtt = client.Client(client.CallbackAPIVersion.VERSION2, protocol=client.MQTTv5)
+        self._mqtt.on_message = self._on_message
+
         # create routes
         self._fastapi = FastAPI(lifespan=self._lifespan)
         self._api_router = APIRouter()
@@ -80,39 +75,18 @@ class GtfsLakeRealtimeServer:
         else:
             self._cache = None
 
-        # enable MQTT connector for realtime data input
-        """mqtt_config = MQTTConfig(
-            host='test.mosquitto.org',
-            port=1883,
-            keepalive=60
-        )
-
-        self._mqtt = FastMQTT(config=mqtt_config)"""
-
     @asynccontextmanager
     async def _lifespan(self, app):
-        await mqtt.mqtt_startup()
+        self._mqtt.connect('test.mosquitto.org', 1883)
+        self._mqtt.loop_start()
+        self._mqtt.subscribe('any/topic')
         yield
-        await mqtt.mqtt_shutdown()
+        self._mqtt.loop_stop()
+        self._mqtt.disconnect()
 
-    @mqtt.on_connect()
-    def _mqtt_connect(client: MQTTClient, flags: int, rc: int, properties: Any):
+    def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):
         l = logging.getLogger('uvicorn')
-        l.info('Connected ...')
-
-        client.subscribe('some/sample/topic')
-
-        l.info('Subscribed ...')
-
-    @mqtt.on_message()
-    async def _mqtt_message(client: MQTTClient, topic: str, payload: bytes, qos: int, properties: Any):
-        l = logging.getLogger('uvicorn')
-        l.info('Received ' + topic + ': ' + str(payload))
-
-    @mqtt.on_disconnect()
-    def _mqtt_disconnect(client: MQTTClient, packet, exc=None):
-        l = logging.getLogger('uvicorn')
-        l.info('Disconnected ...')
+        l.info(str(message))
 
     async def _service_alerts(self, request: Request) -> Response:
 
