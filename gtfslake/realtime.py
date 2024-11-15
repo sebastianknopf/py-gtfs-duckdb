@@ -11,6 +11,7 @@ from fastapi import Request
 from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
 from google.transit import gtfs_realtime_pb2
+from google.protobuf.message import DecodeError
 from google.protobuf.json_format import ParseDict
 from math import floor
 from paho.mqtt import client
@@ -61,8 +62,15 @@ class GtfsLakeRealtimeServer:
             self._mqtt.on_message = self._on_message
 
             self._mqtt_topic_types = dict()
+            self._mqtt_topic_mappings = dict()
             for subscription in self._config['mqtt']['subscriptions']:
                 self._mqtt_topic_types[subscription['topic']] = subscription['type']
+
+                if 'mapping' in subscription:
+                    if 'routes' in subscription['mapping']:
+                        self._mqtt_topic_mappings[subscription['topic']]['routes'] = dict()
+                    elif 'stops' in subscription['mapping']:
+                        self._mqtt_topic_mappings[subscription['topic']]['stops'] = dict()
 
         # create routes
         self._fastapi = FastAPI(lifespan=self._lifespan)
@@ -112,13 +120,13 @@ class GtfsLakeRealtimeServer:
         self._mqtt.disconnect()
 
     def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):
-        subscription_type = self._get_subscription_type(message.topic)
+        subscription_type = self._get_subscription_type(message.topic, message.topic)
         if subscription_type == 'gtfsrt-service-alerts':
-            self._process_gtfsrt_service_alert(message.payload)
+            self._process_gtfsrt_service_alert(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-trip-updates':
-            self._process_gtfsrt_trip_update(message.payload)
+            self._process_gtfsrt_trip_update(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-vehicle-positions':
-            self._process_gtfsrt_vehicle_position(message.payload)
+            self._process_gtfsrt_vehicle_positions(message.topic, message.payload)
 
     def _get_subscription_type(self, topic):
         f=lambda s,p:p in(s,'#')or p[:1]in(s[:1],'+')and f(s[1:],p['+'!=p[:1]or(s[:1]in'/')*2:])
@@ -128,17 +136,52 @@ class GtfsLakeRealtimeServer:
             
         return None
     
-    def _process_gtfsrt_service_alert(payload):
-        feed_message = gtfs_realtime_pb2.FeedMessage()
-        feed_message.ParseFromString(payload)
+    def _get_subscription_mappings(self, topic):
+        f=lambda s,p:p in(s,'#')or p[:1]in(s[:1],'+')and f(s[1:],p['+'!=p[:1]or(s[:1]in'/')*2:])
+        for subscription in self._config['mqtt']['subscriptions']:
+            if f(topic, subscription['topic']):
+                return self._mqtt_topic_mappings[subscription['topic']]
+            
+        return None
+    
+    def _process_gtfsrt_service_alert(self, topic, payload):
+        logger = logging.getLogger('uvicorn')
+        
+        try:
+            feed_message = gtfs_realtime_pb2.FeedMessage()
+            feed_message.ParseFromString(payload)
 
-    def _process_gtfsrt_trip_update(payload):
-        feed_message = gtfs_realtime_pb2.FeedMessage()
-        feed_message.ParseFromString(payload)
+            for entity in feed_message.entity:
+                pass
 
-    def _process_gtfsrt_vehicle_positions(payload):
-        feed_message = gtfs_realtime_pb2.FeedMessage()
-        feed_message.ParseFromString(payload)
+        except DecodeError:
+            logger.info('DecodeError while processing GTFS-RT message')
+
+    def _process_gtfsrt_trip_update(self, topic, payload):
+        logger = logging.getLogger('uvicorn')
+        
+        try:
+            feed_message = gtfs_realtime_pb2.FeedMessage()
+            feed_message.ParseFromString(payload)
+            
+            for entity in feed_message.entity:
+                pass
+
+        except DecodeError:
+            logger.info('DecodeError while processing GTFS-RT message')
+
+    def _process_gtfsrt_vehicle_positions(self, topic, payload):
+        logger = logging.getLogger('uvicorn')
+        
+        try:
+            feed_message = gtfs_realtime_pb2.FeedMessage()
+            feed_message.ParseFromString(payload)
+
+            for entity in feed_message.entity:
+                pass
+
+        except DecodeError:
+            logger.info('DecodeError while processing GTFS-RT message')
 
     async def _service_alerts(self, request: Request) -> Response:
 
