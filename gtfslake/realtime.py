@@ -67,6 +67,8 @@ class GtfsLakeRealtimeServer:
                 self._mqtt_topic_types[subscription['topic']] = subscription['type']
 
                 if 'mapping' in subscription:
+                    self._mqtt_topic_mappings[subscription['topic']] = dict()
+
                     if 'routes' in subscription['mapping']:
                         self._mqtt_topic_mappings[subscription['topic']]['routes'] = dict()
                     elif 'stops' in subscription['mapping']:
@@ -120,7 +122,7 @@ class GtfsLakeRealtimeServer:
         self._mqtt.disconnect()
 
     def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):
-        subscription_type = self._get_subscription_type(message.topic, message.topic)
+        subscription_type = self._get_subscription_type(message.topic)
         if subscription_type == 'gtfsrt-service-alerts':
             self._process_gtfsrt_service_alert(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-trip-updates':
