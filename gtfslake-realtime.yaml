@@ -1,6 +1,7 @@
 app:
   caching_enabled: false
   cors_enabled: true
+  mqtt_enabled: true
   routing:
     service_alerts_endpoint: /gtfs/realtime/service-alerts.pbf
     trip_updates_endpoint: /gtfs/realtime/trip-updates.pbf
@@ -10,3 +11,13 @@ caching:
   caching_service_alerts_ttl_seconds: 60
   caching_trip_updates_ttl_seconds: 30
   caching_vehicle_positions_ttl_seconds: 15
+mqtt:
+  host: test.mosquitto.org
+  port: 1883
+  subscriptions:
+    - topic: realtime/sample/service-alerts/#
+      type: gtfsrt-service-alerts
+    - topic: realtime/sample/tripupdates/#
+      type: gtfsrt-trip-updates
+    - topic: realtime/sample/vehiclepositions/#
+      type: gtfsrt-vehicle-positions

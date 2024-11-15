@@ -22,8 +22,13 @@ class GtfsLakeRealtimeServer:
 
     def __init__(self, database_filename: str, config_filename: str|None):
 
+        self._database_filename = database_filename
+
 		# connect to GTFS lake database
         self._lake = GtfsLake(database_filename)
+
+        # connect to GTFS lake database a second time for independent writing purposes
+        self._lake_mqtt = GtfsLake(database_filename)
 
         # load config and set default values
         if config_filename is not None:
@@ -34,6 +39,7 @@ class GtfsLakeRealtimeServer:
             self._config['app'] = dict()
             self._config['app']['caching_enabled'] = False
             self._config['app']['cors_enabled'] = False
+            self._config['app']['mqtt_enabled'] = False
 
             self._config['app']['routing'] = dict()
             self._config['app']['routing']['service_alerts_endpoint'] = '/gtfs/realtime/service-alerts.pbf'
@@ -45,9 +51,18 @@ class GtfsLakeRealtimeServer:
             self._config['caching']['caching_trip_updates_ttl_seconds'] = 30
             self._config['caching']['caching_vehicle_positions_ttl_seconds'] = 15
 
+            self._config['mqtt']['host'] = ''
+            self._config['mqtt']['port'] = ''
+            self._config['mqtt']['subscriptions'] = list()
+
         # create data notification client
-        self._mqtt = client.Client(client.CallbackAPIVersion.VERSION2, protocol=client.MQTTv5)
-        self._mqtt.on_message = self._on_message
+        if self._config['app']['mqtt_enabled']:
+            self._mqtt = client.Client(client.CallbackAPIVersion.VERSION2, protocol=client.MQTTv5)
+            self._mqtt.on_message = self._on_message
+
+            self._mqtt_topic_types = dict()
+            for subscription in self._config['mqtt']['subscriptions']:
+                self._mqtt_topic_types[subscription['topic']] = subscription['type']
 
         # create routes
         self._fastapi = FastAPI(lifespan=self._lifespan)
@@ -77,16 +92,47 @@ class GtfsLakeRealtimeServer:
 
     @asynccontextmanager
     async def _lifespan(self, app):
+        logger = logging.getLogger('uvicorn')
+        logger.info(f"Connected to MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
+
         self._mqtt.connect('test.mosquitto.org', 1883)
         self._mqtt.loop_start()
-        self._mqtt.subscribe('any/topic')
+
+        for subscription in self._config['mqtt']['subscriptions']:
+            logger.info(f"Subscribing topic {subscription['topic']} ({subscription['type']})")
+            self._mqtt.subscribe(subscription['topic'])
+
         yield
+
+        for subscription in self._config['mqtt']['subscriptions']:
+            logger.info(f"Unsubscribing topic {subscription['topic']} ({subscription['type']})")
+            self._mqtt.unsubscribe(subscription['topic'])
+
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
 
     def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):
         l = logging.getLogger('uvicorn')
-        l.info(str(message))
+        l.info(str(message.topic))
+
+        subscription_type = self._get_subscription_type(message.topic)
+
+        if subscription_type == 'gtfsrt-service-alerts':
+            l.info('Service Alert')
+        elif subscription_type == 'gtfsrt-trip-updates':
+            l.info('Trip Update')
+        elif subscription_type == 'gtfsrt-vehicle-positions':
+            l.info('Vehicle Position')
+
+        self._lake_mqtt._connection.sql('DELETE FROM realtime_service_alerts')
+        self._lake_mqtt._connection.sql('DELETE FROM realtime_alert_informed_entities')
+        self._lake_mqtt._connection.sql('DELETE FROM realtime_alert_active_periods')
+
+    def _get_subscription_type(self, topic):
+        f=lambda s,p:p in(s,'#')or p[:1]in(s[:1],'+')and f(s[1:],p['+'!=p[:1]or(s[:1]in'/')*2:])
+        for subscription in self._config['mqtt']['subscriptions']:
+            if f(topic, subscription['topic']):
+                return subscription['type']
 
     async def _service_alerts(self, request: Request) -> Response:
 
