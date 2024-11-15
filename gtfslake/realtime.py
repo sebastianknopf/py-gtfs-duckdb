@@ -112,27 +112,33 @@ class GtfsLakeRealtimeServer:
         self._mqtt.disconnect()
 
     def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):
-        l = logging.getLogger('uvicorn')
-        l.info(str(message.topic))
-
         subscription_type = self._get_subscription_type(message.topic)
-
         if subscription_type == 'gtfsrt-service-alerts':
-            l.info('Service Alert')
+            self._process_gtfsrt_service_alert(message.payload)
         elif subscription_type == 'gtfsrt-trip-updates':
-            l.info('Trip Update')
+            self._process_gtfsrt_trip_update(message.payload)
         elif subscription_type == 'gtfsrt-vehicle-positions':
-            l.info('Vehicle Position')
-
-        self._lake_mqtt._connection.sql('DELETE FROM realtime_service_alerts')
-        self._lake_mqtt._connection.sql('DELETE FROM realtime_alert_informed_entities')
-        self._lake_mqtt._connection.sql('DELETE FROM realtime_alert_active_periods')
+            self._process_gtfsrt_vehicle_position(message.payload)
 
     def _get_subscription_type(self, topic):
         f=lambda s,p:p in(s,'#')or p[:1]in(s[:1],'+')and f(s[1:],p['+'!=p[:1]or(s[:1]in'/')*2:])
         for subscription in self._config['mqtt']['subscriptions']:
             if f(topic, subscription['topic']):
                 return subscription['type']
+            
+        return None
+    
+    def _process_gtfsrt_service_alert(payload):
+        feed_message = gtfs_realtime_pb2.FeedMessage()
+        feed_message.ParseFromString(payload)
+
+    def _process_gtfsrt_trip_update(payload):
+        feed_message = gtfs_realtime_pb2.FeedMessage()
+        feed_message.ParseFromString(payload)
+
+    def _process_gtfsrt_vehicle_positions(payload):
+        feed_message = gtfs_realtime_pb2.FeedMessage()
+        feed_message.ParseFromString(payload)
 
     async def _service_alerts(self, request: Request) -> Response:
 

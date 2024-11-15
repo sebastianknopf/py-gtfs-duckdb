@@ -17,6 +17,9 @@ mqtt:
   subscriptions:
     - topic: realtime/sample/service-alerts/#
       type: gtfsrt-service-alerts
+      mapping:
+        routes: ./routes_mapping.csv
+        stops: ./stops_mapping.csv
     - topic: realtime/sample/tripupdates/#
       type: gtfsrt-trip-updates
     - topic: realtime/sample/vehiclepositions/#
