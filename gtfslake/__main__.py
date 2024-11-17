@@ -1,5 +1,9 @@
 import click
+import time
 import uvicorn
+
+import datetime as dt
+import polars as pl
 
 from gtfslake.lake import GtfsLake
 from gtfslake.realtime import GtfsLakeRealtimeServer
@@ -65,6 +69,31 @@ def sql(database, files):
 
     for sql_file in files:
         lake.execute_sql(sql_file)
+
+@cli.command()
+@click.argument('database')
+@click.option('--date', '-d', help='Date in format YYYYMMDD to show nominal trips for')
+@click.option('--num-results', '-n', default=200, help='Number of results to show; ignored when using option --output/-o')
+@click.option('--full-trips', '-f', default=False, help='Whether to select all stop times of a trip or not')
+@click.option('--output', '-o', default=None, help='Output file for writing the results')
+def show(database, date, num_results, full_trips, output):
+
+    ref = dt.datetime.strptime(date, '%Y%m%d')
+    
+    lake = GtfsLake(database)
+
+    start_time = time.time()
+    trips = lake.fetch_operation_day_trips(ref, full_trips)
+    end_time = time.time()
+
+    if output is not None:
+        trips.write_csv(output)
+    else:
+        pl.Config.set_tbl_rows(num_results)
+
+        print(f"found {len(trips)} ({num_results} shown) results in {str(end_time - start_time)} seconds")
+        print()
+        print(trips.select(['route_id', 'trip_id', 'direction_id', 'trip_headsign', 'stop_id', 'departure_time']))
 
 @cli.command()
 @click.argument('database')

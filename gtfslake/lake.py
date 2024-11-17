@@ -7,6 +7,8 @@ import polars
 import tempfile
 import zipfile
 
+import datetime as dt
+
 import gtfslake.ddbdef
 
 class GtfsLake:
@@ -128,6 +130,28 @@ class GtfsLake:
         vehicle_positions = self._connection.table('realtime_vehicle_positions').select(duckdb.StarExpression())
 
         return (vehicle_positions.pl())
+
+    def fetch_operation_day_trips(self, operation_day_date: dt.datetime, full_trips = False):
+
+        opd_reference = operation_day_date.strftime("%Y%m%d")
+        opd_dayname = operation_day_date.strftime("%A").lower()
+
+        # determine valid service days
+        calendar_ids = self._connection.table('calendar').filter(f"start_date <= {opd_reference} AND end_date >= {opd_reference} AND {opd_dayname} = '1'").select(duckdb.ColumnExpression('service_id'))
+        calendar_date_added_ids = self._connection.table('calendar_dates').filter(f"date = {opd_reference} AND exception_type = '1'").select(duckdb.ColumnExpression('service_id'))
+        calendar_date_removed_ids = self._connection.table('calendar_dates').filter(f"date = {opd_reference} AND exception_type = '2'").select(duckdb.ColumnExpression('service_id'))
+
+        service_ids = calendar_ids.union(calendar_date_added_ids).except_(calendar_date_removed_ids).fetchall()
+        service_ids = list(zip(*service_ids))[0]
+
+        # get all trips with stop times for matching services        
+        trips = self._connection.table('trips').select(duckdb.StarExpression()).filter(duckdb.ColumnExpression('service_id').isin(*[duckdb.ConstantExpression(s) for s in service_ids]))
+        stop_ids = self._connection.table('stop_times')
+
+        if not full_trips:
+            stop_ids = stop_ids.filter('stop_sequence = 1')
+
+        return (trips.join(stop_ids, "stop_times.trip_id = trips.trip_id").order("trips.trip_id, stop_times.stop_sequence").pl())
 
     def execute_sql(self, sqlfilename):
         with open(sqlfilename, 'r') as sql_file:
