@@ -83,7 +83,7 @@ def show(database, date, num_results, full_trips, output):
     lake = GtfsLake(database)
 
     start_time = time.time()
-    trips = lake.fetch_operation_day_trips(ref, full_trips)
+    trips = lake.fetch_nominal_operation_day_trips(ref, full_trips)
     end_time = time.time()
 
     if output is not None:

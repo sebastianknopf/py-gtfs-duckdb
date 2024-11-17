@@ -131,7 +131,7 @@ class GtfsLake:
 
         return (vehicle_positions.pl())
 
-    def fetch_operation_day_trips(self, operation_day_date: dt.datetime, full_trips = False):
+    def fetch_nominal_operation_day_trips(self, operation_day_date: dt.datetime, full_trips = False):
 
         opd_reference = operation_day_date.strftime("%Y%m%d")
         opd_dayname = operation_day_date.strftime("%A").lower()

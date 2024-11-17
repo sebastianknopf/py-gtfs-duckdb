@@ -1,6 +1,8 @@
+import csv
 import json
 import logging
 import polars as pl
+import time
 import yaml
 
 from contextlib import asynccontextmanager
@@ -30,6 +32,11 @@ class GtfsLakeRealtimeServer:
 
         # connect to GTFS lake database a second time for independent writing purposes
         self._lake_mqtt = GtfsLake(database_filename)
+
+        # create cache container for nominal trips
+        self._nominal_trips = None
+        self._nominal_trips_ids = None
+        self._nominal_trips_reference = None
 
         # load config and set default values
         if config_filename is not None:
@@ -70,9 +77,10 @@ class GtfsLakeRealtimeServer:
                     self._mqtt_topic_mappings[subscription['topic']] = dict()
 
                     if 'routes' in subscription['mapping']:
-                        self._mqtt_topic_mappings[subscription['topic']]['routes'] = dict()
-                    elif 'stops' in subscription['mapping']:
-                        self._mqtt_topic_mappings[subscription['topic']]['stops'] = dict()
+                        self._mqtt_topic_mappings[subscription['topic']]['routes'] = self._read_mapping_csv_dict(subscription['mapping']['routes'])
+                    
+                    if 'stops' in subscription['mapping']:
+                        self._mqtt_topic_mappings[subscription['topic']]['stops'] = self._read_mapping_csv_dict(subscription['mapping']['stops'])
 
         # create routes
         self._fastapi = FastAPI(lifespan=self._lifespan)
@@ -122,6 +130,10 @@ class GtfsLakeRealtimeServer:
         self._mqtt.disconnect()
 
     def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):
+        # load nominal trips
+        self._load_nominal_trips(datetime.now())
+        
+        # process message according to the topic
         subscription_type = self._get_subscription_type(message.topic)
         if subscription_type == 'gtfsrt-service-alerts':
             self._process_gtfsrt_service_alert(message.topic, message.payload)
@@ -146,6 +158,54 @@ class GtfsLakeRealtimeServer:
             
         return None
     
+    def _read_mapping_csv_dict(self, csv_filename):
+        result = dict()
+        
+        with open(csv_filename, 'r') as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=';', quotechar='"')
+            for row in csv_reader:
+                result[row[0]] = row[1]
+
+        return result
+
+    def _load_nominal_trips(self, dtoday: datetime):
+        logger = logging.getLogger('uvicorn')
+
+        reference = dtoday.strftime('%Y%m%d')
+
+        if self._nominal_trips_reference is None or not self._nominal_trips_reference == reference:
+            logger.info('Creating nominal trip index ...')
+
+            self._nominal_trips_reference = reference
+            self._nominal_trips = self._lake.fetch_nominal_operation_day_trips(dtoday, True)
+
+            self._nominal_trips_ids = pl.Series(self._nominal_trips.select('trip_id')).to_list()
+            
+            self._nominal_trips_start_times = dict()
+            self._nominal_trips_intermediate_stops = dict()
+            for nominal_trip in self._nominal_trips.iter_rows(named=True):
+                
+                # store start times to to trip IDs
+                if nominal_trip['route_id'] not in self._nominal_trips_start_times:
+                    self._nominal_trips_start_times[nominal_trip['route_id']] = dict()
+
+                if nominal_trip['departure_time'] not in self._nominal_trips_start_times[nominal_trip['route_id']]:
+                    self._nominal_trips_start_times[nominal_trip['route_id']][nominal_trip['departure_time']] = list()
+
+                if nominal_trip['stop_sequence'] == 1:
+                    self._nominal_trips_start_times[nominal_trip['route_id']][nominal_trip['departure_time']].append(nominal_trip['trip_id'])
+                
+                # store intermediate stops for each trip                
+                if nominal_trip['trip_id'] not in self._nominal_trips_intermediate_stops:
+                    self._nominal_trips_intermediate_stops[nominal_trip['trip_id']] = list()
+
+                self._nominal_trips_intermediate_stops[nominal_trip['trip_id']].append(nominal_trip['stop_id'])
+
+            # delete data frame, we won't use it further for performance issues
+            self._nominal_trips = None
+
+            logger.info(f"Found {len(self._nominal_trips_ids)} unique trips")
+    
     def _process_gtfsrt_service_alert(self, topic, payload):
         logger = logging.getLogger('uvicorn')
         
@@ -157,20 +217,91 @@ class GtfsLakeRealtimeServer:
                 pass
 
         except DecodeError:
-            logger.info('DecodeError while processing GTFS-RT message')
+            logger.info('DecodeError while processing GTFSRT message')
 
     def _process_gtfsrt_trip_update(self, topic, payload):
         logger = logging.getLogger('uvicorn')
-        
+
         try:
             feed_message = gtfs_realtime_pb2.FeedMessage()
             feed_message.ParseFromString(payload)
-            
-            for entity in feed_message.entity:
-                pass
 
+            # verify that the message is not older than review time in hours
+            if feed_message.HasField('header') and feed_message.header.HasField('timestamp'):
+                feed_message_timestamp = feed_message.header.timestamp
+                
+                if (int(time.time()) - feed_message_timestamp) > 60 * 60 * 2:
+                    logger.warning(f"Deprecated feed message for topic {topic} discarded")
+                    return
+            
+            # load mapping
+            mappings = self._get_subscription_mappings(topic)
+
+            # process all entities of type trip_update
+            for entity in feed_message.entity:
+                if entity.HasField('trip_update'):
+
+                    # create new message with adapted data
+                    matching_feed_message = gtfs_realtime_pb2.FeedMessage()
+                    matching_entity = matching_feed_message.entity.add()
+
+                    matching_entity.CopyFrom(entity)
+
+                    # map route and stop IDs
+                    route_id = matching_entity.trip_update.trip.route_id if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('route_id') else None
+                    if 'routes' in mappings and route_id in mappings['routes']:
+                        matching_entity.trip_update.trip.route_id = mappings['routes'][route_id]
+
+                    for stop_time_update in matching_entity.trip_update.stop_time_update:
+                        stop_id = stop_time_update.stop_id if stop_time_update.HasField('stop_id') else None
+                        if 'stops' in mappings and stop_id in mappings['stops']:
+                            stop_time_update.stop_id = mappings['stops'][stop_id]
+
+                    # check whether the trip is already known or must be matched
+                    if matching_entity.trip_update.trip.trip_id in self._nominal_trips_ids: # if the trip ID is already known from nominal trip IDs
+                        logger.info(f"Trip {matching_entity.trip_update.trip.trip_id} found in nominal trips")
+                        # TODO: add trip update to database
+                    else: # if the trip ID does not exists, start matching here
+                        if not matching_entity.trip_update.trip.HasField('start_time'):
+                            logger.warning(f"Trip {matching_entity.trip_update.trip.trip_id} as no start_time attribute and cannot be matched")
+                            return
+                        
+                        if matching_entity.trip_update.trip.route_id not in self._nominal_trips_start_times:
+                            return
+                    
+                        if matching_entity.trip_update.trip.start_time not in self._nominal_trips_start_times[matching_entity.trip_update.trip.route_id]:
+                            return
+                        
+                        trip_id_matched = False
+                        for candidate in self._nominal_trips_start_times[matching_entity.trip_update.trip.route_id][matching_entity.trip_update.trip.start_time]:
+                            matching_entity.trip_update.trip.trip_id = candidate
+
+                            # check whether stop time updates match the nominal intermediate stops
+                            intermediate_stops_matching = True
+                            for stu in matching_entity.trip_update.stop_time_update:
+                                if stu.stop_sequence >= len(self._nominal_trips_intermediate_stops[candidate]):
+                                    intermediate_stops_matching = False
+                                    break
+
+                                if not self._nominal_trips_intermediate_stops[candidate][max(0, stu.stop_sequence - 1)] == stu.stop_id:
+                                    intermediate_stops_matching = False
+                                    break
+
+                            if intermediate_stops_matching:
+                                trip_id_matched = True
+                                break
+
+                        if not trip_id_matched:
+                            logger.warning(f"Could not match trip {entity.trip_update.trip.trip_id} due to intermediate stop mismatch")
+                            return
+                        
+                        logger.info(f"Matched trip {entity.trip_update.trip.trip_id} to nominal trip {matching_entity.trip_update.trip.trip_id}")
+                        # TODO: add trip update to database
+                else:
+                    logger.error(f"Trip update {topic} has no trip descriptor")
+                    
         except DecodeError:
-            logger.info('DecodeError while processing GTFS-RT message')
+            logger.info('DecodeError while processing GTFSRT message')
 
     def _process_gtfsrt_vehicle_positions(self, topic, payload):
         logger = logging.getLogger('uvicorn')
@@ -183,7 +314,7 @@ class GtfsLakeRealtimeServer:
                 pass
 
         except DecodeError:
-            logger.info('DecodeError while processing GTFS-RT message')
+            logger.info('DecodeError while processing GTFSRT message')
 
     async def _service_alerts(self, request: Request) -> Response:
 
