@@ -124,7 +124,7 @@ class GtfsRealtimeAdapter:
         trip_update_data['trip_direction_id'] = entity.trip_update.trip.direction_id if entity.trip_update.HasField('trip') and entity.trip_update.trip.HasField('direction_id') else None
         trip_update_data['trip_start_time'] = entity.trip_update.trip.start_time if entity.trip_update.HasField('trip') and entity.trip_update.trip.HasField('start_time') else None
         trip_update_data['trip_start_date'] = entity.trip_update.trip.start_date if entity.trip_update.HasField('trip') and entity.trip_update.trip.HasField('start_date') else None
-        trip_update_data['trip_schedule_relationship'] = entity.trip_update.trip.schedule_relationship if entity.trip_update.HasField('trip') and entity.trip_update.trip.HasField('schedule_relationship') else None
+        trip_update_data['trip_schedule_relationship'] = gtfs_realtime_pb2.TripDescriptor.ScheduleRelationship.Name(entity.trip_update.trip.schedule_relationship) if entity.trip_update.HasField('trip') and entity.trip_update.trip.HasField('schedule_relationship') else None
         # TODO: implement vehicle data
 
         for stu in entity.trip_update.stop_time_update:
@@ -139,7 +139,7 @@ class GtfsRealtimeAdapter:
             stop_time_update_data['departure_time'] = stu.departure.time if stu.HasField('departure') and stu.departure.HasField('time') else None
             stop_time_update_data['departure_delay'] = stu.departure.delay if stu.HasField('departure') and stu.departure.HasField('delay') else None
             stop_time_update_data['departure_uncertainty'] = stu.departure.uncertainty if stu.HasField('departure') and stu.departure.HasField('uncertainty') else None
-            stop_time_update_data['schedule_relationship'] = stu.schedule_relationship if stu.HasField('schedule_relationship') else None
+            stop_time_update_data['schedule_relationship'] = gtfs_realtime_pb2.TripUpdate.StopTimeUpdate.ScheduleRelationship.Name(stu.schedule_relationship) if stu.HasField('schedule_relationship') else None
 
             trip_stop_time_update_data.append(stop_time_update_data)
 
