@@ -46,6 +46,7 @@ class GtfsLakeRealtimeServer:
             self._config = dict()
             self._config['app'] = dict()
             self._config['app']['caching_enabled'] = False
+            self._config['app']['monitor_enabled'] = True
             self._config['app']['cors_enabled'] = False
             self._config['app']['mqtt_enabled'] = False
 
@@ -53,6 +54,7 @@ class GtfsLakeRealtimeServer:
             self._config['app']['routing']['service_alerts_endpoint'] = '/gtfs/realtime/service-alerts.pbf'
             self._config['app']['routing']['trip_updates_endpoint'] = '/gtfs/realtime/trip-updates.pbf'
             self._config['app']['routing']['vehicle_positions_endpoint'] = '/gtfs/realtime/vehicle-positions.pbf'
+            self._config['app']['routing']['monitor_endpoint'] = '/monitor'
 
             self._config['caching']['caching_server_endpoint'] = ''
             self._config['caching']['caching_service_alerts_ttl_seconds'] = 60
@@ -92,6 +94,9 @@ class GtfsLakeRealtimeServer:
         self._api_router.add_api_route(self._config['app']['routing']['service_alerts_endpoint'], endpoint=self._service_alerts, methods=['GET'], name='service_alerts')
         self._api_router.add_api_route(self._config['app']['routing']['trip_updates_endpoint'], endpoint=self._trip_updates, methods=['GET'], name='trip_updates')
         self._api_router.add_api_route(self._config['app']['routing']['vehicle_positions_endpoint'], endpoint=self._vehicle_positions, methods=['GET'], name='vehicle_positions')
+
+        if self._config['app']['monitor_enabled']:
+            self._api_router.add_api_route(self._config['app']['routing']['monitor_endpoint'], endpoint=self._monitor, methods=['GET'], name='monitor')
 
         # add CORS features if enabled in config
         if self._config['app']['cors_enabled']:
@@ -477,6 +482,62 @@ class GtfsLakeRealtimeServer:
                 self._cache.set(f"{request.url.path}-{format}", pbf_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
 
             return Response(content=pbf_result, media_type='application/octet-stream')
+        
+    async def _monitor(self, request: Request) -> Response:
+
+        # read request GET params
+        format = request.query_params['f'] if 'f' in request.query_params else 'html'
+        date = request.query_params['d'] if 'd' in request.query_params else None
+        realtime = True if 'r' in request.query_params else False
+        
+        # create reference date
+        reference = datetime.now()
+        if date is not None:
+            try:
+                reference = datetime.strptime(date, '%Y%m%d')
+            except ValueError:
+                pass
+
+        # fetch data
+        trips = self._lake.fetch_realtime_operation_day_monitor_trips(reference)
+
+        # filter for realtime available only, if requested
+        if realtime:
+            trips = trips.filter(pl.col('realtime_available') == 'true')
+
+        # return results
+        if format == 'json':
+            return Response(content=trips.write_json(), media_type='application/json')
+        else:
+            
+            # generate viewable HTML table
+            table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>OperationDay</td><td>RouteID</td><td>TripID</td><td>TripHeadsign</td><td>DirectionID</td><td>StartStopID</td><td>StartStopName</td><td>StartTime</td><td>RealtimeAvailable</td></tr></thead><tbody>'
+
+            for trip in trips.iter_rows(named=True):
+                if trip['realtime_available']:
+                    style = 'style="background:green"'
+                else:
+                    style = 'style="background:red"'
+                
+                table = table + f'<tr><td>{trip['operation_day']}</td><td>{trip['route_id']}</td><td>{trip['trip_id']}</td><td>{trip['trip_headsign']}</td><td>{trip['direction_id']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['start_time']}</td><td {style}>{trip['realtime_available']}</td></tr>'
+                
+            table = table + '</tbody></table>'
+
+            # wrap with very basic html
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    <meta charset="UTF-8" />
+                </head>
+                <body>
+                    <h1>gtfslake realtime server (version 0.1.0)</h1>
+                    {table}
+                </body>
+            </html>
+            """
+            
+            return Response(content=html, media_type='text/html')
 
     def _create_feed_message(self, entities):
         return {

@@ -1,11 +1,13 @@
 app:
   caching_enabled: false
+  monitor_enabled: true
   cors_enabled: true
   mqtt_enabled: true
   routing:
     service_alerts_endpoint: /gtfs/realtime/service-alerts.pbf
     trip_updates_endpoint: /gtfs/realtime/trip-updates.pbf
-    vehicle_positions_endpoint: /gtfs/realtime/vehicle-positions.pbf 
+    vehicle_positions_endpoint: /gtfs/realtime/vehicle-positions.pbf
+    monitor_endpoint: /monitor
 caching:
   caching_server_endpoint: [MemcachedServerInstance]
   caching_service_alerts_ttl_seconds: 60

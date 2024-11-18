@@ -174,6 +174,42 @@ class GtfsLake:
             stop_ids = stop_ids.filter('stop_sequence = 1')
 
         return (trips.join(stop_ids, "stop_times.trip_id = trips.trip_id").order("trips.trip_id, stop_times.stop_sequence").pl())
+    
+    def fetch_realtime_operation_day_monitor_trips(self, operation_day_date: dt.datetime):
+        opd_reference = operation_day_date.strftime("%Y%m%d")
+        opd_dayname = operation_day_date.strftime("%A").lower()
+
+        # determine valid service days
+        calendar_ids = self._connection.table('calendar').filter(f"start_date <= {opd_reference} AND end_date >= {opd_reference} AND {opd_dayname} = '1'").select(duckdb.ColumnExpression('service_id'))
+        calendar_date_added_ids = self._connection.table('calendar_dates').filter(f"date = {opd_reference} AND exception_type = '1'").select(duckdb.ColumnExpression('service_id'))
+        calendar_date_removed_ids = self._connection.table('calendar_dates').filter(f"date = {opd_reference} AND exception_type = '2'").select(duckdb.ColumnExpression('service_id'))
+
+        service_ids = calendar_ids.union(calendar_date_added_ids).except_(calendar_date_removed_ids).fetchall()
+        service_ids = list(zip(*service_ids))[0]
+
+        # get all trips with stop times for matching services        
+        trips = self._connection.table('trips').select(duckdb.StarExpression()).filter(duckdb.ColumnExpression('service_id').isin(*[duckdb.ConstantExpression(s) for s in service_ids]))
+        stops = self._connection.table('stops')
+        stop_times = self._connection.table('stop_times').filter('stop_sequence = 1')
+        realtime_trip_updates = self._connection.table('realtime_trip_updates')
+
+        # put it all together ...
+        result = trips.join(stop_times, "stop_times.trip_id = trips.trip_id").join(realtime_trip_updates, 'realtime_trip_updates.trip_id = trips.trip_id', how='left').join(stops, 'stops.stop_id = stop_times.stop_id').order("stop_times.departure_time")
+
+        # select required destination columns
+        result_columns = [
+            duckdb.ConstantExpression(opd_reference).alias('operation_day'),
+            duckdb.ColumnExpression('trips.route_id').alias('route_id'),
+            duckdb.ColumnExpression('trips.trip_id').alias('trip_id'),
+            duckdb.ColumnExpression('trips.trip_headsign').alias('trip_headsign'),
+            duckdb.ColumnExpression('trips.direction_id').alias('direction_id'),
+            duckdb.ColumnExpression('stop_times.stop_id').alias('start_stop_id'),
+            duckdb.ColumnExpression('stops.stop_name').alias('start_stop_name'),
+            duckdb.ColumnExpression('stop_times.departure_time').alias('start_time'),
+            duckdb.ColumnExpression('realtime_trip_updates.trip_id').isnotnull().alias('realtime_available')
+        ]
+
+        return result.select(*result_columns).pl()
 
     def execute_sql(self, sqlfilename):
         with open(sqlfilename, 'r') as sql_file:
