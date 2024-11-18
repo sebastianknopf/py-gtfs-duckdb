@@ -121,7 +121,7 @@ class GtfsLakeRealtimeServer:
         logger = logging.getLogger('uvicorn')
         logger.info(f"Connected to MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
 
-        self._mqtt.connect('test.mosquitto.org', 1883)
+        self._mqtt.connect(self._config['mqtt']['host'], self._config['mqtt']['port'])
         self._mqtt.loop_start()
 
         for subscription in self._config['mqtt']['subscriptions']:
