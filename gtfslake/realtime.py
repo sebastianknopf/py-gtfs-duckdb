@@ -68,7 +68,7 @@ class GtfsLakeRealtimeServer:
 
         # create data notification client
         if self._config['app']['mqtt_enabled']:
-            self._mqtt = client.Client(client.CallbackAPIVersion.VERSION2, protocol=client.MQTTv5)
+            self._mqtt = client.Client(client.CallbackAPIVersion.VERSION2, protocol=client.MQTTv5, client_id=self._config['mqtt']['client'])
             self._mqtt.on_message = self._on_message
 
             self._mqtt_topic_types = dict()
