@@ -11,9 +11,13 @@ caching:
   caching_service_alerts_ttl_seconds: 60
   caching_trip_updates_ttl_seconds: 30
   caching_vehicle_positions_ttl_seconds: 15
+matching:
+  match_against_first_stop_id: true
+  match_against_stop_ids: false
 mqtt:
   host: test.mosquitto.org
   port: 1883
+  client: gtfslake-realtime
   subscriptions:
     - topic: realtime/sample/service-alerts/#
       type: gtfsrt-service-alerts

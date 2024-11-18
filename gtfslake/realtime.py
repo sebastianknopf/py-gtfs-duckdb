@@ -59,6 +59,9 @@ class GtfsLakeRealtimeServer:
             self._config['caching']['caching_trip_updates_ttl_seconds'] = 30
             self._config['caching']['caching_vehicle_positions_ttl_seconds'] = 15
 
+            self._config['matching']['match_against_first_stop_id'] = True
+            self._config['matching']['match_against_stop_ids'] = False
+
             self._config['mqtt']['host'] = ''
             self._config['mqtt']['port'] = ''
             self._config['mqtt']['subscriptions'] = list()
@@ -179,7 +182,7 @@ class GtfsLakeRealtimeServer:
             self._nominal_trips_reference = reference
             self._nominal_trips = self._lake.fetch_nominal_operation_day_trips(dtoday, True)
 
-            self._nominal_trips_ids = pl.Series(self._nominal_trips.select('trip_id')).to_list()
+            self._nominal_trips_ids = pl.Series(self._nominal_trips.select('trip_id').unique()).to_list()
             
             self._nominal_trips_start_times = dict()
             self._nominal_trips_intermediate_stops = dict()
@@ -279,11 +282,23 @@ class GtfsLakeRealtimeServer:
                             # check whether stop time updates match the nominal intermediate stops
                             intermediate_stops_matching = True
                             for stu in matching_entity.trip_update.stop_time_update:
+                                if not self._config['matching']['match_against_first_stop_id'] and not self._config['matching']['match_against_stop_ids']:
+                                    break
+
+                                if self._config['matching']['match_against_first_stop_id'] and not self._config['matching']['match_against_stop_ids']:
+                                    if stu.stop_sequence != 1:
+                                        continue
+
                                 if stu.stop_sequence >= len(self._nominal_trips_intermediate_stops[candidate]):
+                                    logger.warning(f"Could not match trip {entity.trip_update.trip.trip_id} due to nominal stop number mismatch")
                                     intermediate_stops_matching = False
                                     break
 
-                                if not self._nominal_trips_intermediate_stops[candidate][max(0, stu.stop_sequence - 1)] == stu.stop_id:
+                                stu_index = (stu.stop_sequence - 1)
+                                act_id = stu.stop_id
+                                nom_id = self._nominal_trips_intermediate_stops[candidate][max(0, stu_index)]
+                                if not nom_id == act_id:
+                                    logger.warning(f"Could not match trip {entity.trip_update.trip.trip_id} due to an intermediate stop mismatch (nom: seq={stu_index},id={nom_id}; act: seq={stu_index},id={act_id})")
                                     intermediate_stops_matching = False
                                     break
 
@@ -292,7 +307,6 @@ class GtfsLakeRealtimeServer:
                                 break
 
                         if not trip_id_matched:
-                            logger.warning(f"Could not match trip {entity.trip_update.trip.trip_id} due to intermediate stop mismatch")
                             return
                         
                         logger.info(f"Matched trip {entity.trip_update.trip.trip_id} to nominal trip {matching_entity.trip_update.trip.trip_id}")
