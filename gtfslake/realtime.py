@@ -263,7 +263,38 @@ class GtfsLakeRealtimeServer:
                     # check whether the trip is already known or must be matched
                     if matching_entity.trip_update.trip.trip_id in self._nominal_trips_ids: # if the trip ID is already known from nominal trip IDs
                         logger.info(f"Trip {matching_entity.trip_update.trip.trip_id} found in nominal trips")
-                        # TODO: add trip update to database
+                        
+                        # add trip update to database
+                        trip_update_data = dict()
+                        trip_stop_time_update_data = list()
+
+                        trip_update_data['trip_update_id'] = matching_entity.id
+                        trip_update_data['trip_id'] = matching_entity.trip_update.trip.trip_id if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('trip_id') else None
+                        trip_update_data['trip_route_id'] = matching_entity.trip_update.trip.route_id if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('route_id') else None
+                        trip_update_data['trip_direction_id'] = matching_entity.trip_update.trip.direction_id if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('direction_id') else None
+                        trip_update_data['trip_start_time'] = matching_entity.trip_update.trip.start_time if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('start_time') else None
+                        trip_update_data['trip_start_date'] = matching_entity.trip_update.trip.start_date if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('start_date') else None
+                        trip_update_data['trip_schedule_relationship'] = matching_entity.trip_update.trip.schedule_relationship if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('schedule_relationship') else None
+                        # TODO: implement vehicle data
+
+                        for stu in matching_entity.trip_update.stop_time_update:
+                            stop_time_update_data = dict()
+
+                            stop_time_update_data['trip_update_id'] = matching_entity.id
+                            stop_time_update_data['stop_sequence'] = stu.stop_sequence if stu.HasField('stop_sequence') else None
+                            stop_time_update_data['stop_id'] = stu.stop_id if stu.HasField('stop_id') else None
+                            stop_time_update_data['arrival_time'] = stu.arrival.time if stu.HasField('arrival') and stu.arrival.HasField('time') else None
+                            stop_time_update_data['arrival_delay'] = stu.arrival.delay if stu.HasField('arrival') and stu.arrival.HasField('delay') else None
+                            stop_time_update_data['arrival_uncertainty'] = stu.arrival.uncertainty if stu.HasField('arrival') and stu.arrival.HasField('uncertainty') else None
+                            stop_time_update_data['departure_time'] = stu.departure.time if stu.HasField('departure') and stu.departure.HasField('time') else None
+                            stop_time_update_data['departure_delay'] = stu.departure.delay if stu.HasField('departure') and stu.departure.HasField('delay') else None
+                            stop_time_update_data['departure_uncertainty'] = stu.departure.uncertainty if stu.HasField('departure') and stu.departure.HasField('uncertainty') else None
+                            stop_time_update_data['schedule_relationship'] = stu.schedule_relationship if stu.HasField('schedule_relationship') else None
+
+                            trip_stop_time_update_data.append(stop_time_update_data)
+
+                        self._lake_mqtt.insert_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
+                        
                     else: # if the trip ID does not exists, start matching here
                         if not matching_entity.trip_update.trip.HasField('start_time'):
                             logger.warning(f"Trip {matching_entity.trip_update.trip.trip_id} as no start_time attribute and cannot be matched")
@@ -277,6 +308,7 @@ class GtfsLakeRealtimeServer:
                         
                         trip_id_matched = False
                         for candidate in self._nominal_trips_start_times[matching_entity.trip_update.trip.route_id][matching_entity.trip_update.trip.start_time]:
+                            matching_entity.id = candidate
                             matching_entity.trip_update.trip.trip_id = candidate
 
                             # check whether stop time updates match the nominal intermediate stops
@@ -310,7 +342,37 @@ class GtfsLakeRealtimeServer:
                             return
                         
                         logger.info(f"Matched trip {entity.trip_update.trip.trip_id} to nominal trip {matching_entity.trip_update.trip.trip_id}")
-                        # TODO: add trip update to database
+                        
+                        # add trip update to database
+                        trip_update_data = dict()
+                        trip_stop_time_update_data = list()
+
+                        trip_update_data['trip_update_id'] = matching_entity.id
+                        trip_update_data['trip_id'] = matching_entity.trip_update.trip.trip_id if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('trip_id') else None
+                        trip_update_data['trip_route_id'] = matching_entity.trip_update.trip.route_id if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('route_id') else None
+                        trip_update_data['trip_direction_id'] = matching_entity.trip_update.trip.direction_id if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('direction_id') else None
+                        trip_update_data['trip_start_time'] = matching_entity.trip_update.trip.start_time if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('start_time') else None
+                        trip_update_data['trip_start_date'] = matching_entity.trip_update.trip.start_date if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('start_date') else None
+                        trip_update_data['trip_schedule_relationship'] = matching_entity.trip_update.trip.schedule_relationship if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('schedule_relationship') else None
+                        # TODO: implement vehicle data
+
+                        for stu in matching_entity.trip_update.stop_time_update:
+                            stop_time_update_data = dict()
+
+                            stop_time_update_data['trip_update_id'] = matching_entity.id
+                            stop_time_update_data['stop_sequence'] = stu.stop_sequence if stu.HasField('stop_sequence') else None
+                            stop_time_update_data['stop_id'] = stu.stop_id if stu.HasField('stop_id') else None
+                            stop_time_update_data['arrival_time'] = stu.arrival.time if stu.HasField('arrival') and stu.arrival.HasField('time') else None
+                            stop_time_update_data['arrival_delay'] = stu.arrival.delay if stu.HasField('arrival') and stu.arrival.HasField('delay') else None
+                            stop_time_update_data['arrival_uncertainty'] = stu.arrival.uncertainty if stu.HasField('arrival') and stu.arrival.HasField('uncertainty') else None
+                            stop_time_update_data['departure_time'] = stu.departure.time if stu.HasField('departure') and stu.departure.HasField('time') else None
+                            stop_time_update_data['departure_delay'] = stu.departure.delay if stu.HasField('departure') and stu.departure.HasField('delay') else None
+                            stop_time_update_data['departure_uncertainty'] = stu.departure.uncertainty if stu.HasField('departure') and stu.departure.HasField('uncertainty') else None
+                            stop_time_update_data['schedule_relationship'] = stu.schedule_relationship if stu.HasField('schedule_relationship') else None
+
+                            trip_stop_time_update_data.append(stop_time_update_data)
+
+                        self._lake_mqtt.insert_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
                 else:
                     logger.error(f"Trip update {topic} has no trip descriptor")
                     
@@ -329,7 +391,7 @@ class GtfsLakeRealtimeServer:
 
         except DecodeError:
             logger.info('DecodeError while processing GTFSRT message')
-
+    
     async def _service_alerts(self, request: Request) -> Response:
 
         # check whether there're cached data

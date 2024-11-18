@@ -111,6 +111,9 @@ class GtfsLake:
                     if os.path.exists(tmp_file):
                         os.remove(tmp_file)
 
+    def insert_realtime_service_alerts(self, service_alerts, alert_active_periods, alert_informed_entities):
+        pass
+
     def fetch_realtime_service_alerts(self):
 
         service_alerts = self._connection.table('realtime_service_alerts').select(duckdb.StarExpression())
@@ -119,12 +122,23 @@ class GtfsLake:
 
         return (service_alerts.pl(), alert_active_periods.pl(), alert_informed_entities.pl())
 
+    def insert_realtime_trip_updates(self, trip_update, stop_time_updates):
+
+        self._connection.execute('DELETE FROM realtime_trip_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
+        self._connection.execute('DELETE FROM realtime_trip_stop_time_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
+
+        self._insert('realtime_trip_updates', list(trip_update.keys()), list(trip_update.values()))
+        self._insert('realtime_trip_stop_time_updates', [list(c.keys()) for c in stop_time_updates], [list(v.values()) for v in stop_time_updates], True)           
+
     def fetch_realtime_trip_updates(self):
 
         trip_updates = self._connection.table('realtime_trip_updates').select(duckdb.StarExpression())
         trip_stop_time_updates = self._connection.table('realtime_trip_stop_time_updates').select(duckdb.StarExpression())
 
         return (trip_updates.pl(), trip_stop_time_updates.pl())
+
+    def insert_realtime_vehicle_positions(self, vehicle_positions):
+        pass
 
     def fetch_realtime_vehicle_positions(self):
         vehicle_positions = self._connection.table('realtime_vehicle_positions').select(duckdb.StarExpression())
@@ -158,6 +172,22 @@ class GtfsLake:
             sql_stmt = sql_file.read()
 
         self._connection.execute(sql_stmt)
+
+    def _insert(self, table, columns, values, multiple=False):
+        if not type(columns) == type(values):
+            raise ValueError('mismatching input types for columns and values - both inputs must have same type')
+        
+        if not len(columns) == len(values):
+            raise ValueError('mismatching input lengt for columns and values - both inputs must have same length')
+
+        if multiple:
+            for n in range(0, len(columns)):
+                cols = columns[n]
+                vals = values[n]
+
+                self._connection.execute(f"INSERT INTO {table} ({','.join(cols)}) VALUES ({','.join(['?' for k in cols])})", vals)
+        else:
+            self._connection.execute(f"INSERT INTO {table} ({','.join(columns)}) VALUES ({','.join(['?' for k in columns])})", values)
 
     def _remove_dependent_objects(self):
         self._connection.execute('DELETE FROM routes WHERE agency_id NOT IN (SELECT agency_id FROM agency)')
