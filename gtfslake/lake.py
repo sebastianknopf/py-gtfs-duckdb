@@ -144,6 +144,14 @@ class GtfsLake:
         vehicle_positions = self._connection.table('realtime_vehicle_positions').select(duckdb.StarExpression())
 
         return (vehicle_positions.pl())
+    
+    def clear_realtime_data(self):
+        self._connection.execute('DELETE FROM realtime_vehicle_positions')
+        self._connection.execute('DELETE FROM realtime_trip_updates')
+        self._connection.execute('DELETE FROM realtime_trip_stop_time_updates')
+        self._connection.execute('DELETE FROM realtime_service_alerts')
+        self._connection.execute('DELETE FROM realtime_alert_active_periods')
+        self._connection.execute('DELETE FROM realtime_alert_informed_entities')
 
     def fetch_nominal_operation_day_trips(self, operation_day_date: dt.datetime, full_trips = False):
 

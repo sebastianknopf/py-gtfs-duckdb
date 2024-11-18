@@ -111,6 +111,11 @@ class GtfsLakeRealtimeServer:
         else:
             self._cache = None
 
+        # delete existing realtime data in order to avoid deprecated data
+        # since data are only loaded from MQTT broker as retained messages,
+        # they sould be restored after server startup, if they're still valid
+        self._lake.clear_realtime_data()
+
     @asynccontextmanager
     async def _lifespan(self, app):
         logger = logging.getLogger('uvicorn')
