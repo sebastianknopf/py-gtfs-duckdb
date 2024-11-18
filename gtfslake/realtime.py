@@ -111,18 +111,22 @@ class GtfsLakeRealtimeServer:
         else:
             self._cache = None
 
+    @asynccontextmanager
+    async def _lifespan(self, app):
+        logger = logging.getLogger('uvicorn')
+
+        # load nominal trips
+        self._load_nominal_trips(datetime.now())
+
         # delete existing realtime data in order to avoid deprecated data
         # since data are only loaded from MQTT broker as retained messages,
         # they sould be restored after server startup, if they're still valid
         self._lake.clear_realtime_data()
 
-    @asynccontextmanager
-    async def _lifespan(self, app):
-        logger = logging.getLogger('uvicorn')
-        logger.info(f"Connected to MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
-
         self._mqtt.connect(self._config['mqtt']['host'], self._config['mqtt']['port'])
         self._mqtt.loop_start()
+
+        logger.info(f"Connected to MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
 
         for subscription in self._config['mqtt']['subscriptions']:
             logger.info(f"Subscribing topic {subscription['topic']} ({subscription['type']})")
@@ -137,11 +141,8 @@ class GtfsLakeRealtimeServer:
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
 
-    def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):
-        # load nominal trips
-        self._load_nominal_trips(datetime.now())
-        
-        # process message according to the topic
+    def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):        
+        # process message according to the topic type
         subscription_type = self._get_subscription_type(message.topic)
         if subscription_type == 'gtfsrt-service-alerts':
             self._process_gtfsrt_service_alert(message.topic, message.payload)
