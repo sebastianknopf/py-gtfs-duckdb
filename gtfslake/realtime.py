@@ -66,6 +66,8 @@ class GtfsLakeRealtimeServer:
 
             self._config['mqtt']['host'] = ''
             self._config['mqtt']['port'] = ''
+            self._config['mqtt']['client'] = 'gtfslake-realtime-default-client'
+            self._config['mqtt']['keepalive'] = 60
             self._config['mqtt']['subscriptions'] = list()
 
         # create data notification client
@@ -129,7 +131,7 @@ class GtfsLakeRealtimeServer:
         # they sould be restored after server startup, if they're still valid
         self._lake.clear_realtime_data()
 
-        self._mqtt.connect(self._config['mqtt']['host'], self._config['mqtt']['port'])
+        self._mqtt.connect(self._config['mqtt']['host'], self._config['mqtt']['port'], keepalive=self._config['mqtt']['keepalive'])
         self._mqtt.loop_start()
 
         logger.info(f"Connected to MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")

@@ -20,6 +20,7 @@ mqtt:
   host: test.mosquitto.org
   port: 1883
   client: gtfslake-realtime
+  keepalive: 60
   subscriptions:
     - topic: realtime/sample/service-alerts/#
       type: gtfsrt-service-alerts
