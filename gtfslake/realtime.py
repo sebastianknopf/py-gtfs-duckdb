@@ -72,6 +72,8 @@ class GtfsLakeRealtimeServer:
         if self._config['app']['mqtt_enabled']:
             self._mqtt = client.Client(client.CallbackAPIVersion.VERSION2, protocol=client.MQTTv5, client_id=self._config['mqtt']['client'])
             self._mqtt.on_message = self._on_message
+            self._mqtt.on_connect = self._on_connect
+            self._mqtt.on_disconnect = self._on_disconnect
 
             self._mqtt_topic_types = dict()
             self._mqtt_topic_mappings = dict()
@@ -132,18 +134,20 @@ class GtfsLakeRealtimeServer:
 
         logger.info(f"Connected to MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
 
-        for subscription in self._config['mqtt']['subscriptions']:
-            logger.info(f"Subscribing topic {subscription['topic']} ({subscription['type']})")
-            self._mqtt.subscribe(subscription['topic'])
-
         yield
-
-        for subscription in self._config['mqtt']['subscriptions']:
-            logger.info(f"Unsubscribing topic {subscription['topic']} ({subscription['type']})")
-            self._mqtt.unsubscribe(subscription['topic'])
 
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
+
+        logger.info(f"Disconnected from MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
+
+    def _on_connect(self, client, userdata, flags, rc, properties):
+        logger = logging.getLogger('uvicorn')
+
+        # subscribe all desired topics
+        for subscription in self._config['mqtt']['subscriptions']:
+            logger.info(f"Subscribing topic {subscription['topic']} ({subscription['type']})")
+            self._mqtt.subscribe(subscription['topic'])
 
     def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):   
         
@@ -158,6 +162,14 @@ class GtfsLakeRealtimeServer:
         elif subscription_type == 'gtfsrt-vehicle-positions':
             adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic), self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             #adapter.process_vehicle_positions(message.topic, message.payload)
+
+    def _on_disconnect(self, client, userdata, flags, rc, properties):
+        logger = logging.getLogger('uvicorn')
+
+        # unsubscribe all MQTT topics
+        for subscription in self._config['mqtt']['subscriptions']:
+            logger.info(f"Unsubscribing topic {subscription['topic']} ({subscription['type']})")
+            self._mqtt.unsubscribe(subscription['topic'])
 
     def _get_subscription_type(self, topic):
         f=lambda s,p:p in(s,'#')or p[:1]in(s[:1],'+')and f(s[1:],p['+'!=p[:1]or(s[:1]in'/')*2:])
@@ -523,7 +535,7 @@ class GtfsLakeRealtimeServer:
                 else:
                     style = 'style="background:red"'
                 
-                table = table + f'<tr><td>{trip['operation_day']}</td><td>{trip['route_id']}</td><td>{trip['trip_id']}</td><td>{trip['direction_id']}</td><td>{trip['start_time']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['trip_headsign']}</td><td {style}>{trip['realtime_available']}</td></tr>'
+                table = table + f"<tr><td>{trip['operation_day']}</td><td>{trip['route_id']}</td><td>{trip['trip_id']}</td><td>{trip['direction_id']}</td><td>{trip['start_time']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['trip_headsign']}</td><td {style}>{trip['realtime_available']}</td></tr>"
                 
             table = table + '</tbody></table>'
 
