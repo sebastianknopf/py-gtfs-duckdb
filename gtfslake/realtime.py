@@ -34,7 +34,7 @@ class GtfsLakeRealtimeServer:
 
         # connect to GTFS lake database a second time for independent writing purposes
         self._lake_mqtt = GtfsLake(database_filename)
-        self._lake_mqtt_timer = RepeatedTimer(15, self._lake_mqtt._execute_realtime_insert_queues)
+        self._lake_mqtt_timer = RepeatedTimer(15, self._execute_realtime_insert_queues)
 
         # create cache container for nominal trips
         self._nominal_trips = None
@@ -250,6 +250,12 @@ class GtfsLakeRealtimeServer:
 
             logger.info(f"Found {len(self._nominal_trips_ids)} unique trips")
     
+    def _execute_realtime_insert_queues(self):
+        logger = logging.getLogger('uvicorn')
+
+        logger.info('Executing realtime insert queues ...')
+        self._lake_mqtt._execute_realtime_insert_queues()
+
     async def _service_alerts(self, request: Request) -> Response:
 
         # check whether there're cached data
