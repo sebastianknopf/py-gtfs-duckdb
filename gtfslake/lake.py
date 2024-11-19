@@ -9,6 +9,8 @@ import zipfile
 
 import datetime as dt
 
+from queue import Queue
+
 import gtfslake.ddbdef
 
 class GtfsLake:
@@ -39,6 +41,11 @@ class GtfsLake:
             'realtime_trip_stop_time_updates',
             'realtime_vehicle_positions'
         ]
+
+        # queues for realtime data inserts
+        self._realtime_service_alerts_queue = Queue()
+        self._realtime_trip_update_queue = Queue()
+        self._realtime_vehicle_positions_queue = Queue()
 
         if not read_only_flag:
             # generate static tables
@@ -124,11 +131,16 @@ class GtfsLake:
 
     def insert_realtime_trip_updates(self, trip_update, stop_time_updates):
 
-        self._connection.execute('DELETE FROM realtime_trip_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
+        """self._connection.execute('DELETE FROM realtime_trip_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
         self._connection.execute('DELETE FROM realtime_trip_stop_time_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
 
         self._insert('realtime_trip_updates', list(trip_update.keys()), list(trip_update.values()))
-        self._insert('realtime_trip_stop_time_updates', [list(c.keys()) for c in stop_time_updates], [list(v.values()) for v in stop_time_updates], True)           
+        self._insert('realtime_trip_stop_time_updates', [list(c.keys()) for c in stop_time_updates], [list(v.values()) for v in stop_time_updates], True)"""
+
+        """self._realtime_trip_updates_buffer.append(trip_update)
+        self._realtime_trip_stop_time_updates_buffer.append(stop_time_updates) """
+
+        self._realtime_trip_update_queue.put((trip_update, stop_time_updates))          
 
     def fetch_realtime_trip_updates(self):
 
@@ -232,6 +244,21 @@ class GtfsLake:
                 self._connection.execute(f"INSERT INTO {table} ({','.join(cols)}) VALUES ({','.join(['?' for k in cols])})", vals)
         else:
             self._connection.execute(f"INSERT INTO {table} ({','.join(columns)}) VALUES ({','.join(['?' for k in columns])})", values)
+
+    def _execute_realtime_insert_queues(self):
+        # process service alerts
+
+        # process trip updates
+        while not self._realtime_trip_update_queue.empty():
+            trip_update, stop_time_updates = self._realtime_trip_update_queue.get()
+
+            self._connection.execute('DELETE FROM realtime_trip_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
+            self._connection.execute('DELETE FROM realtime_trip_stop_time_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
+
+            self._insert('realtime_trip_updates', list(trip_update.keys()), list(trip_update.values()))
+            self._insert('realtime_trip_stop_time_updates', [list(c.keys()) for c in stop_time_updates], [list(v.values()) for v in stop_time_updates], True)
+
+        # process vehicle positions
 
     def _remove_dependent_objects(self):
         self._connection.execute('DELETE FROM routes WHERE agency_id NOT IN (SELECT agency_id FROM agency)')

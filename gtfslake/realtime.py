@@ -17,8 +17,10 @@ from google.protobuf.json_format import ParseDict
 from math import floor
 from paho.mqtt import client
 from typing import Any
+from threading import Thread
 
 from gtfslake.lake import GtfsLake
+from gtfslake.repeatedtimer import RepeatedTimer
 from gtfslake.adapter.gtfsrt import GtfsRealtimeAdapter
 
 class GtfsLakeRealtimeServer:
@@ -32,6 +34,7 @@ class GtfsLakeRealtimeServer:
 
         # connect to GTFS lake database a second time for independent writing purposes
         self._lake_mqtt = GtfsLake(database_filename)
+        self._lake_mqtt_timer = RepeatedTimer(15, self._lake_mqtt._execute_realtime_insert_queues)
 
         # create cache container for nominal trips
         self._nominal_trips = None
@@ -126,10 +129,15 @@ class GtfsLakeRealtimeServer:
         # load nominal trips
         self._load_nominal_trips(datetime.now())
 
+        # start database realtime insert timer
+        self._lake_mqtt_timer.start()
+
         # delete existing realtime data in order to avoid deprecated data
         # since data are only loaded from MQTT broker as retained messages,
         # they sould be restored after server startup, if they're still valid
         self._lake.clear_realtime_data()
+
+        logger.info('Started realtime data insert timer with interval of 15s')
 
         self._mqtt.connect(self._config['mqtt']['host'], self._config['mqtt']['port'], keepalive=self._config['mqtt']['keepalive'])
         self._mqtt.loop_start()
@@ -142,6 +150,11 @@ class GtfsLakeRealtimeServer:
         self._mqtt.disconnect()
 
         logger.info(f"Disconnected from MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
+
+        # stop database realtime insert timer
+        self._lake_mqtt_timer.stop()
+
+        logger.info('Stopped realtime data insert timer')
 
     def _on_connect(self, client, userdata, flags, rc, properties):
         logger = logging.getLogger('uvicorn')
