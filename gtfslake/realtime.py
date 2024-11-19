@@ -489,6 +489,7 @@ class GtfsLakeRealtimeServer:
         format = request.query_params['f'] if 'f' in request.query_params else 'html'
         date = request.query_params['d'] if 'd' in request.query_params else None
         realtime = True if 'r' in request.query_params else False
+        line = request.query_params['l'] if 'l' in request.query_params else None
         
         # create reference date
         reference = datetime.now()
@@ -501,9 +502,12 @@ class GtfsLakeRealtimeServer:
         # fetch data
         trips = self._lake.fetch_realtime_operation_day_monitor_trips(reference)
 
-        # filter for realtime available only, if requested
+        # apply filters here ...
         if realtime:
             trips = trips.filter(pl.col('realtime_available') == 'true')
+
+        if line is not None:
+            trips = trips.filter(pl.col('route_id') == line)
 
         # return results
         if format == 'json':
@@ -511,7 +515,7 @@ class GtfsLakeRealtimeServer:
         else:
             
             # generate viewable HTML table
-            table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>OperationDay</td><td>RouteID</td><td>TripID</td><td>TripHeadsign</td><td>DirectionID</td><td>StartStopID</td><td>StartStopName</td><td>StartTime</td><td>RealtimeAvailable</td></tr></thead><tbody>'
+            table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>OperationDay</td><td>RouteID</td><td>TripID</td><td>DirectionID</td><td>StartTime</td><td>StartStopID</td><td>StartStopName</td><td>TripHeadsign</td><td>RealtimeAvailable</td></tr></thead><tbody>'
 
             for trip in trips.iter_rows(named=True):
                 if trip['realtime_available']:
@@ -519,7 +523,7 @@ class GtfsLakeRealtimeServer:
                 else:
                     style = 'style="background:red"'
                 
-                table = table + f'<tr><td>{trip['operation_day']}</td><td>{trip['route_id']}</td><td>{trip['trip_id']}</td><td>{trip['trip_headsign']}</td><td>{trip['direction_id']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['start_time']}</td><td {style}>{trip['realtime_available']}</td></tr>'
+                table = table + f'<tr><td>{trip['operation_day']}</td><td>{trip['route_id']}</td><td>{trip['trip_id']}</td><td>{trip['direction_id']}</td><td>{trip['start_time']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['trip_headsign']}</td><td {style}>{trip['realtime_available']}</td></tr>'
                 
             table = table + '</tbody></table>'
 
