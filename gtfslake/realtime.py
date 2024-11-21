@@ -23,6 +23,8 @@ from gtfslake.lake import GtfsLake
 from gtfslake.repeatedtimer import RepeatedTimer
 from gtfslake.adapter.gtfsrt import GtfsRealtimeAdapter
 
+from gtfslake.__version__ import __version__
+
 class GtfsLakeRealtimeServer:
 
     def __init__(self, database_filename: str, config_filename: str|None):
@@ -578,7 +580,7 @@ class GtfsLakeRealtimeServer:
                     <meta charset="UTF-8" />
                 </head>
                 <body>
-                    <h1>gtfslake realtime server (version 0.1.0)</h1>
+                    <h1>gtfslake realtime server (version {__version__})</h1>
                     {table}
                 </body>
             </html>
