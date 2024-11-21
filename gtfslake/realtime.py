@@ -390,26 +390,28 @@ class GtfsLakeRealtimeServer:
                     stu['stop_id'] = stop_time_update['stop_id']
 
                 # build arrival time update
-                stu['arrival'] = dict()
-                if stop_time_update['arrival_time'] is not None:
-                    stu['arrival']['time'] = stop_time_update['arrival_time']
+                if stop_time_update['arrival_time'] is not None or stop_time_update['arrival_delay'] is not None:
+                    stu['arrival'] = dict()
+                    if stop_time_update['arrival_time'] is not None:
+                        stu['arrival']['time'] = stop_time_update['arrival_time']
 
-                if stop_time_update['arrival_delay'] is not None:
-                    stu['arrival']['delay'] = stop_time_update['arrival_delay']
+                    if stop_time_update['arrival_delay'] is not None:
+                        stu['arrival']['delay'] = stop_time_update['arrival_delay']
 
-                if stop_time_update['arrival_uncertainty'] is not None:
-                    stu['arrival']['uncertainty'] = stop_time_update['arrival_uncertainty']
+                    if stop_time_update['arrival_uncertainty'] is not None:
+                        stu['arrival']['uncertainty'] = stop_time_update['arrival_uncertainty']
 
                 # build departure time update
-                stu['departure'] = dict()
-                if stop_time_update['departure_time'] is not None:
-                    stu['departure']['time'] = stop_time_update['departure_time']
+                if stop_time_update['departure_time'] is not None or stop_time_update['departure_delay'] is not None:
+                    stu['departure'] = dict()
+                    if stop_time_update['departure_time'] is not None:
+                        stu['departure']['time'] = stop_time_update['departure_time']
 
-                if stop_time_update['departure_delay'] is not None:
-                    stu['departure']['delay'] = stop_time_update['departure_delay']
+                    if stop_time_update['departure_delay'] is not None:
+                        stu['departure']['delay'] = stop_time_update['departure_delay']
 
-                if stop_time_update['departure_uncertainty'] is not None:
-                    stu['departure']['uncertainty'] = stop_time_update['departure_uncertainty']
+                    if stop_time_update['departure_uncertainty'] is not None:
+                        stu['departure']['uncertainty'] = stop_time_update['departure_uncertainty']
 
                 stu['schedule_relationship'] = stop_time_update['schedule_relationship']
 
