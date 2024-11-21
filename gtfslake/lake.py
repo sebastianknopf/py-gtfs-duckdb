@@ -199,23 +199,27 @@ class GtfsLake:
         # get all trips with stop times for matching services        
         trips = self._connection.table('trips').select(duckdb.StarExpression()).filter(duckdb.ColumnExpression('service_id').isin(*[duckdb.ConstantExpression(s) for s in service_ids]))
         stops = self._connection.table('stops')
+        routes = self._connection.table('routes')
         stop_times = self._connection.table('stop_times').filter('stop_sequence = 1')
         realtime_trip_updates = self._connection.table('realtime_trip_updates')
 
         # put it all together ...
-        result = trips.join(stop_times, "stop_times.trip_id = trips.trip_id").join(realtime_trip_updates, 'realtime_trip_updates.trip_id = trips.trip_id', how='left').join(stops, 'stops.stop_id = stop_times.stop_id').order("stop_times.departure_time")
+        result = trips.join(routes, "routes.route_id = trips.route_id").join(stop_times, "stop_times.trip_id = trips.trip_id").join(realtime_trip_updates, 'realtime_trip_updates.trip_id = trips.trip_id', how='left').join(stops, 'stops.stop_id = stop_times.stop_id').order("stop_times.departure_time")
 
         # select required destination columns
         result_columns = [
             duckdb.ConstantExpression(opd_reference).alias('operation_day'),
+            duckdb.ColumnExpression('routes.agency_id').alias('agency_id'),
             duckdb.ColumnExpression('trips.route_id').alias('route_id'),
+            duckdb.ColumnExpression('routes.route_short_name').alias('route_short_name'),
             duckdb.ColumnExpression('trips.trip_id').alias('trip_id'),
             duckdb.ColumnExpression('trips.trip_headsign').alias('trip_headsign'),
             duckdb.ColumnExpression('trips.direction_id').alias('direction_id'),
             duckdb.ColumnExpression('stop_times.stop_id').alias('start_stop_id'),
             duckdb.ColumnExpression('stops.stop_name').alias('start_stop_name'),
             duckdb.ColumnExpression('stop_times.departure_time').alias('start_time'),
-            duckdb.ColumnExpression('realtime_trip_updates.trip_id').isnotnull().alias('realtime_available')
+            duckdb.ColumnExpression('realtime_trip_updates.trip_id').isnotnull().alias('realtime_available'),
+            duckdb.ColumnExpression('realtime_trip_updates.last_updated_timestamp').alias('realtime_last_update')
         ]
 
         return result.select(*result_columns).pl()
@@ -244,8 +248,8 @@ class GtfsLake:
 
     def _execute_realtime_queues(self):
         # delete realtime elements which were not updated for more than 2 hours
-        current_timestamp = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        delete_timestamp = current_timestamp - dt.timedelta(hours=2)
+        delete_timestamp = dt.datetime.now() - dt.timedelta(hours=2)
+        delete_timestamp = delete_timestamp.strftime('%Y-%m-%d %H:%M:%S')
 
         # TODO: implement clearing routine for service alerts too
 

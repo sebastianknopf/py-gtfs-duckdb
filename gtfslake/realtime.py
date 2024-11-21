@@ -560,7 +560,7 @@ class GtfsLakeRealtimeServer:
         else:
             
             # generate viewable HTML table
-            table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>OperationDay</td><td>RouteID</td><td>TripID</td><td>DirectionID</td><td>StartTime</td><td>StartStopID</td><td>StartStopName</td><td>TripHeadsign</td><td>RealtimeAvailable</td></tr></thead><tbody>'
+            table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>OperationDay</td><td>AgencyID</td><td>RouteID</td><td>RouteShortName</td><td>TripID</td><td>DirectionID</td><td>StartTime</td><td>StartStopID</td><td>StartStopName</td><td>TripHeadsign</td><td>RealtimeAvailable</td><td>RealtimeLastUpdate</td></tr></thead><tbody>'
 
             for trip in trips.iter_rows(named=True):
                 if trip['realtime_available']:
@@ -568,7 +568,7 @@ class GtfsLakeRealtimeServer:
                 else:
                     style = 'style="background:red"'
                 
-                table = table + f"<tr><td>{trip['operation_day']}</td><td>{trip['route_id']}</td><td>{trip['trip_id']}</td><td>{trip['direction_id']}</td><td>{trip['start_time']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['trip_headsign']}</td><td {style}>{trip['realtime_available']}</td></tr>"
+                table = table + f"<tr><td>{trip['operation_day']}</td><td>{trip['agency_id']}</td><td>{trip['route_id']}</td><td>{trip['route_short_name']}</td><td>{trip['trip_id']}</td><td>{trip['direction_id']}</td><td>{trip['start_time']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['trip_headsign']}</td><td {style}>{trip['realtime_available']}</td><td>{trip['realtime_last_update']}</td></tr>"
                 
             table = table + '</tbody></table>'
 
