@@ -43,6 +43,10 @@ class GtfsLake:
         ]
 
         # queues for realtime data inserts
+        self._realtime_service_alerts_delete_queue = Queue()
+        self._realtime_trip_updates_delete_queue = Queue()
+        self._realtime_vehicle_positions_delete_queue = Queue()
+
         self._realtime_service_alerts_queue = Queue()
         self._realtime_trip_update_queue = Queue()
         self._realtime_vehicle_positions_queue = Queue()
@@ -130,16 +134,6 @@ class GtfsLake:
         return (service_alerts.pl(), alert_active_periods.pl(), alert_informed_entities.pl())
 
     def insert_realtime_trip_updates(self, trip_update, stop_time_updates):
-
-        """self._connection.execute('DELETE FROM realtime_trip_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
-        self._connection.execute('DELETE FROM realtime_trip_stop_time_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
-
-        self._insert('realtime_trip_updates', list(trip_update.keys()), list(trip_update.values()))
-        self._insert('realtime_trip_stop_time_updates', [list(c.keys()) for c in stop_time_updates], [list(v.values()) for v in stop_time_updates], True)"""
-
-        """self._realtime_trip_updates_buffer.append(trip_update)
-        self._realtime_trip_stop_time_updates_buffer.append(stop_time_updates) """
-
         self._realtime_trip_update_queue.put((trip_update, stop_time_updates))          
 
     def fetch_realtime_trip_updates(self):
@@ -148,6 +142,9 @@ class GtfsLake:
         trip_stop_time_updates = self._connection.table('realtime_trip_stop_time_updates').select(duckdb.StarExpression())
 
         return (trip_updates.pl(), trip_stop_time_updates.pl())
+
+    def delete_realtime_trip_updates(self, trip_update, stop_time_updates):
+        self._realtime_trip_updates_delete_queue.put((trip_update, stop_time_updates))
 
     def insert_realtime_vehicle_positions(self, vehicle_positions):
         pass
@@ -245,10 +242,16 @@ class GtfsLake:
         else:
             self._connection.execute(f"INSERT INTO {table} ({','.join(columns)}) VALUES ({','.join(['?' for k in columns])})", values)
 
-    def _execute_realtime_insert_queues(self):
+    def _execute_realtime_queues(self):
         # process service alerts
 
         # process trip updates
+        while not self._realtime_trip_updates_delete_queue.empty():
+            trip_update, stop_time_updates = self._realtime_trip_update_queue.get()
+
+            self._connection.execute('DELETE FROM realtime_trip_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
+            self._connection.execute('DELETE FROM realtime_trip_stop_time_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
+
         while not self._realtime_trip_update_queue.empty():
             trip_update, stop_time_updates = self._realtime_trip_update_queue.get()
 
