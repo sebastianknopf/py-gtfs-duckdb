@@ -243,6 +243,17 @@ class GtfsLake:
             self._connection.execute(f"INSERT INTO {table} ({','.join(columns)}) VALUES ({','.join(['?' for k in columns])})", values)
 
     def _execute_realtime_queues(self):
+        # delete realtime elements which were not updated for more than 2 hours
+        current_timestamp = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        delete_timestamp = current_timestamp - dt.timedelta(hours=2)
+
+        # TODO: implement clearing routine for service alerts too
+
+        self._connection.execute("DELETE FROM realtime_trip_updates WHERE last_updated_timestamp <= strptime(?, '%Y-%m-%d %H:%M:%S')", [delete_timestamp])
+        self._connection.execute("DELETE FROM realtime_trip_stop_time_updates WHERE last_updated_timestamp <= strptime(?, '%Y-%m-%d %H:%M:%S')", [delete_timestamp])
+
+        self._connection.execute("DELETE FROM realtime_vehicle_positions WHERE last_updated_timestamp <= strptime(?, '%Y-%m-%d %H:%M:%S')", [delete_timestamp])
+
         # process service alerts
 
         # process trip updates

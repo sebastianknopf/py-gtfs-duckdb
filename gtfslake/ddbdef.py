@@ -178,7 +178,8 @@ schema = {
         stop_id                       TEXT,
         current_status                TEXT,
         timestamp                     INTEGER,
-        congestion_level              TEXT
+        congestion_level              TEXT,
+        last_updated_timestamp        TIMESTAMP DEFAULT current_timestamp
     )
     """,
     'realtime_trip_updates': """
@@ -195,7 +196,8 @@ schema = {
         vehicle_label TEXT,
         vehicle_license_plate TEXT,
         vehicle_wheelchair_accessible TEXT,
-        timestamp INTEGER
+        timestamp INTEGER,
+        last_updated_timestamp        TIMESTAMP DEFAULT current_timestamp
     )
     """,
     'realtime_trip_stop_time_updates': """
@@ -210,7 +212,8 @@ schema = {
         departure_time        INTEGER,
         departure_delay       INTEGER,
         departure_uncertainty INTEGER,
-        schedule_relationship TEXT
+        schedule_relationship TEXT,
+        last_updated_timestamp TIMESTAMP DEFAULT current_timestamp
     )
     """,
     'realtime_service_alerts': """
@@ -224,7 +227,8 @@ schema = {
         description_text     TEXT NOT NULL,
         tts_header_text      TEXT,
         tts_description_text TEXT,
-        severity_level       TEXT
+        severity_level       TEXT,
+        last_updated_timestamp TIMESTAMP DEFAULT current_timestamp
     )
     """,
     'realtime_alert_active_periods': """
@@ -232,7 +236,8 @@ schema = {
     (
         service_alert_id TEXT NOT NULL,
         start_timestamp  INTEGER,
-        end_timestamp    INTEGER
+        end_timestamp    INTEGER,
+        last_updated_timestamp TIMESTAMP DEFAULT current_timestamp
     )
     """,
     'realtime_alert_informed_entities': """
@@ -248,7 +253,8 @@ schema = {
         trip_start_time            TEXT,
         trip_start_date            TEXT,
         trip_schedule_relationship TEXT,
-        stop_id                    TEXT
+        stop_id                    TEXT,
+        last_updated_timestamp TIMESTAMP DEFAULT current_timestamp
     )
     """
 }
