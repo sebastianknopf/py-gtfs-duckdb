@@ -21,6 +21,8 @@ mqtt:
   port: 1883
   client: gtfslake-realtime
   keepalive: 60
+  username: null
+  password: null
   subscriptions:
     - topic: realtime/sample/service-alerts/#
       type: gtfsrt-service-alerts

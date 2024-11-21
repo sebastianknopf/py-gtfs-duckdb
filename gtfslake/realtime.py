@@ -71,6 +71,8 @@ class GtfsLakeRealtimeServer:
             self._config['mqtt']['port'] = ''
             self._config['mqtt']['client'] = 'gtfslake-realtime-default-client'
             self._config['mqtt']['keepalive'] = 60
+            self._config['mqtt']['username'] = None
+            self._config['mqtt']['password'] = None
             self._config['mqtt']['subscriptions'] = list()
 
         # create data notification client
@@ -139,6 +141,9 @@ class GtfsLakeRealtimeServer:
 
         logger.info('Started realtime data insert timer with interval of 15s')
 
+        if self._config['mqtt']['username'] is not None and self._config['mqtt']['password'] is not None:
+            self._mqtt.username_pw_set(username=self._config['mqtt']['username'], password=self._config['mqtt']['password'])
+
         self._mqtt.connect(self._config['mqtt']['host'], self._config['mqtt']['port'], keepalive=self._config['mqtt']['keepalive'])
         self._mqtt.loop_start()
 
@@ -159,10 +164,13 @@ class GtfsLakeRealtimeServer:
     def _on_connect(self, client, userdata, flags, rc, properties):
         logger = logging.getLogger('uvicorn')
 
-        # subscribe all desired topics
-        for subscription in self._config['mqtt']['subscriptions']:
-            logger.info(f"Subscribing topic {subscription['topic']} ({subscription['type']})")
-            self._mqtt.subscribe(subscription['topic'])
+        if not rc.is_failure:
+            # subscribe all desired topics
+            for subscription in self._config['mqtt']['subscriptions']:
+                logger.info(f"Subscribing topic {subscription['topic']} ({subscription['type']})")
+                self._mqtt.subscribe(subscription['topic'])
+        else:
+            logger.error(f"Failed to connect to MQTT broker with reason: {rc}")
 
     def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):   
         
