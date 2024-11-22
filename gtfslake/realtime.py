@@ -61,6 +61,8 @@ class GtfsLakeRealtimeServer:
             self._config['app']['routing']['vehicle_positions_endpoint'] = '/gtfs/realtime/vehicle-positions.pbf'
             self._config['app']['routing']['monitor_endpoint'] = '/monitor'
 
+            self._config['app']['data_review_seconds'] = 600
+
             self._config['caching']['caching_server_endpoint'] = ''
             self._config['caching']['caching_service_alerts_ttl_seconds'] = 60
             self._config['caching']['caching_trip_updates_ttl_seconds'] = 30
@@ -264,7 +266,7 @@ class GtfsLakeRealtimeServer:
         logger = logging.getLogger('uvicorn')
 
         logger.info('Executing realtime queues ...')
-        self._lake_mqtt._execute_realtime_queues()
+        self._lake_mqtt._execute_realtime_queues(self._config['app']['data_review_seconds'])
 
     async def _service_alerts(self, request: Request) -> Response:
 

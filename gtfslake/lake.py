@@ -246,9 +246,9 @@ class GtfsLake:
         else:
             self._connection.execute(f"INSERT INTO {table} ({','.join(columns)}) VALUES ({','.join(['?' for k in columns])})", values)
 
-    def _execute_realtime_queues(self):
+    def _execute_realtime_queues(self, data_review_seconds=7200):
         # delete realtime elements which were not updated for more than 2 hours
-        delete_timestamp = dt.datetime.now() - dt.timedelta(hours=2)
+        delete_timestamp = dt.datetime.now() - dt.timedelta(seconds=data_review_seconds)
         delete_timestamp = delete_timestamp.strftime('%Y-%m-%d %H:%M:%S')
 
         # TODO: implement clearing routine for service alerts too
