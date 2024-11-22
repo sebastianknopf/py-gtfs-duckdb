@@ -345,7 +345,7 @@ class GtfsLakeRealtimeServer:
         # send response
         feed_message = self._create_feed_message(objects)
         if format  == 'json':
-            json_result = json.dumps(feed_message)
+            json_result = json.dumps(feed_message, indent=4)
 
             if self._cache is not None:
                 self._cache.set(f"{request.url.path}-{format}", json_result, self._config['caching']['caching_service_alerts_ttl_seconds'])
@@ -434,7 +434,7 @@ class GtfsLakeRealtimeServer:
         # send response
         feed_message = self._create_feed_message(objects)
         if format  == 'json':
-            json_result = json.dumps(feed_message)
+            json_result = json.dumps(feed_message, indent=4)
 
             if self._cache is not None:
                 self._cache.set(f"{request.url.path}-{format}", json_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
@@ -516,7 +516,7 @@ class GtfsLakeRealtimeServer:
         # send response
         feed_message = self._create_feed_message(objects)
         if format  == 'json':
-            json_result = json.dumps(feed_message)
+            json_result = json.dumps(feed_message, indent=4)
 
             if self._cache is not None:
                 self._cache.set(f"{request.url.path}-{format}", json_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
