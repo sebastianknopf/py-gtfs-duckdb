@@ -2,6 +2,7 @@ import csv
 import duckdb
 import importlib
 import io
+import logging
 import os
 import polars
 import tempfile
@@ -56,6 +57,8 @@ class GtfsLake:
             for txt_filename in gtfs_static_file.namelist():
                 if txt_filename.replace('.txt', '') in self.static_tables:
                     with io.TextIOWrapper(gtfs_static_file.open(txt_filename), encoding='utf-8') as txt_file:
+                        logging.info(f"loading {gtfs_static_filename}")
+                        
                         self._load_txt_file(txt_file, txt_filename.replace('.txt', ''))
 
     def remove_agencies(self, agency_pattern, remove_dependent_objects=True):

@@ -1,4 +1,5 @@
 import click
+import logging
 import time
 import uvicorn
 
@@ -8,6 +9,12 @@ import polars as pl
 from gtfslake.lake import GtfsLake
 from gtfslake.realtime import GtfsLakeRealtimeServer
 
+
+logging.basicConfig(
+    level=logging.INFO, 
+    format= '[%(asctime)s] %(levelname)s: %(message)s',
+    datefmt='%H:%M:%S'
+)
 
 @click.group()
 def cli():
