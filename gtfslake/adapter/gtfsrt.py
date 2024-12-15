@@ -52,10 +52,15 @@ class GtfsRealtimeAdapter:
 
                     # check whether the trip is already known or must be matched
                     if matching_entity.trip_update.trip.trip_id in self._nominal_trips_ids: # if the trip ID is already known from nominal trip IDs
-                        logger.info(f"Trip {matching_entity.trip_update.trip.trip_id} found in nominal trips")
                         
-                        # add trip update to database
-                        self._insert_trip_update(matching_entity)
+                        if matching_entity.HasField('is_deleted') and matching_entity.is_deleted:
+                            # remove trip update from database
+                            logger.info(f"Deleted existing trip {matching_entity.trip_update.trip.trip_id} of nominal trips")
+                            self._delete_trip_update(matching_entity)
+                        else:
+                            # add trip update to database
+                            logger.info(f"Added existing trip {matching_entity.trip_update.trip.trip_id} of nominal trips")
+                            self._insert_trip_update(matching_entity)
                         
                     else: # if the trip ID does not exists, start matching here
                         if not matching_entity.trip_update.trip.HasField('start_time'):
@@ -102,11 +107,15 @@ class GtfsRealtimeAdapter:
 
                         if not trip_id_matched:
                             return
-                        
-                        logger.info(f"Matched trip {entity.trip_update.trip.trip_id} to nominal trip {matching_entity.trip_update.trip.trip_id}")
-                        
-                        # add trip update to database
-                        self._insert_trip_update(matching_entity)
+              
+                        if matching_entity.HasField('is_deleted') and matching_entity.is_deleted:
+                            # remove trip update from database
+                            logger.info(f"Deleted trip {entity.trip_update.trip.trip_id} matching to nominal trip {matching_entity.trip_update.trip.trip_id}")
+                            self._delete_trip_update(matching_entity)
+                        else:
+                            # add trip update to database
+                            logger.info(f"Added trip {entity.trip_update.trip.trip_id} matching to nominal trip {matching_entity.trip_update.trip.trip_id}")
+                            self._insert_trip_update(matching_entity)
 
                 else:
                     logger.error(f"Trip update {topic} has no trip descriptor")
@@ -115,6 +124,14 @@ class GtfsRealtimeAdapter:
             logger.info('DecodeError while processing GTFSRT message')
 
     def _insert_trip_update(self, entity):
+        trip_update_data, trip_stop_time_update_data = self._transform_trip_update(entity)
+        self._lake.insert_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
+
+    def _delete_trip_update(self, entity):
+        trip_update_data, trip_stop_time_update_data = self._transform_trip_update(entity)
+        self._lake.delete_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
+
+    def _transform_trip_update(self, entity):
         trip_update_data = dict()
         trip_stop_time_update_data = list()
 
@@ -143,4 +160,6 @@ class GtfsRealtimeAdapter:
 
             trip_stop_time_update_data.append(stop_time_update_data)
 
-        self._lake.insert_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
+        return (trip_update_data, trip_stop_time_update_data)
+
+

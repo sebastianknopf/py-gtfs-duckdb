@@ -17,9 +17,13 @@ from google.protobuf.json_format import ParseDict
 from math import floor
 from paho.mqtt import client
 from typing import Any
+from threading import Thread
 
 from gtfslake.lake import GtfsLake
+from gtfslake.repeatedtimer import RepeatedTimer
 from gtfslake.adapter.gtfsrt import GtfsRealtimeAdapter
+
+from gtfslake.__version__ import __version__
 
 class GtfsLakeRealtimeServer:
 
@@ -32,6 +36,7 @@ class GtfsLakeRealtimeServer:
 
         # connect to GTFS lake database a second time for independent writing purposes
         self._lake_mqtt = GtfsLake(database_filename)
+        self._lake_mqtt_timer = RepeatedTimer(15, self._execute_realtime_queues)
 
         # create cache container for nominal trips
         self._nominal_trips = None
@@ -56,6 +61,8 @@ class GtfsLakeRealtimeServer:
             self._config['app']['routing']['vehicle_positions_endpoint'] = '/gtfs/realtime/vehicle-positions.pbf'
             self._config['app']['routing']['monitor_endpoint'] = '/monitor'
 
+            self._config['app']['data_review_seconds'] = 600
+
             self._config['caching']['caching_server_endpoint'] = ''
             self._config['caching']['caching_service_alerts_ttl_seconds'] = 60
             self._config['caching']['caching_trip_updates_ttl_seconds'] = 30
@@ -66,12 +73,18 @@ class GtfsLakeRealtimeServer:
 
             self._config['mqtt']['host'] = ''
             self._config['mqtt']['port'] = ''
+            self._config['mqtt']['client'] = 'gtfslake-realtime-default-client'
+            self._config['mqtt']['keepalive'] = 60
+            self._config['mqtt']['username'] = None
+            self._config['mqtt']['password'] = None
             self._config['mqtt']['subscriptions'] = list()
 
         # create data notification client
         if self._config['app']['mqtt_enabled']:
             self._mqtt = client.Client(client.CallbackAPIVersion.VERSION2, protocol=client.MQTTv5, client_id=self._config['mqtt']['client'])
             self._mqtt.on_message = self._on_message
+            self._mqtt.on_connect = self._on_connect
+            self._mqtt.on_disconnect = self._on_disconnect
 
             self._mqtt_topic_types = dict()
             self._mqtt_topic_mappings = dict()
@@ -122,28 +135,46 @@ class GtfsLakeRealtimeServer:
         # load nominal trips
         self._load_nominal_trips(datetime.now())
 
+        # start database realtime insert timer
+        self._lake_mqtt_timer.start()
+
         # delete existing realtime data in order to avoid deprecated data
         # since data are only loaded from MQTT broker as retained messages,
         # they sould be restored after server startup, if they're still valid
         self._lake.clear_realtime_data()
 
-        self._mqtt.connect(self._config['mqtt']['host'], self._config['mqtt']['port'])
+        logger.info('Started realtime data insert timer with interval of 15s')
+
+        if self._config['mqtt']['username'] is not None and self._config['mqtt']['password'] is not None:
+            self._mqtt.username_pw_set(username=self._config['mqtt']['username'], password=self._config['mqtt']['password'])
+
+        self._mqtt.connect(self._config['mqtt']['host'], self._config['mqtt']['port'], keepalive=self._config['mqtt']['keepalive'])
         self._mqtt.loop_start()
 
         logger.info(f"Connected to MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
 
-        for subscription in self._config['mqtt']['subscriptions']:
-            logger.info(f"Subscribing topic {subscription['topic']} ({subscription['type']})")
-            self._mqtt.subscribe(subscription['topic'])
-
         yield
-
-        for subscription in self._config['mqtt']['subscriptions']:
-            logger.info(f"Unsubscribing topic {subscription['topic']} ({subscription['type']})")
-            self._mqtt.unsubscribe(subscription['topic'])
 
         self._mqtt.loop_stop()
         self._mqtt.disconnect()
+
+        logger.info(f"Disconnected from MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
+
+        # stop database realtime insert timer
+        self._lake_mqtt_timer.stop()
+
+        logger.info('Stopped realtime data insert timer')
+
+    def _on_connect(self, client, userdata, flags, rc, properties):
+        logger = logging.getLogger('uvicorn')
+
+        if not rc.is_failure:
+            # subscribe all desired topics
+            for subscription in self._config['mqtt']['subscriptions']:
+                logger.info(f"Subscribing topic {subscription['topic']} ({subscription['type']})")
+                self._mqtt.subscribe(subscription['topic'])
+        else:
+            logger.error(f"Failed to connect to MQTT broker with reason: {rc}")
 
     def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):   
         
@@ -158,6 +189,14 @@ class GtfsLakeRealtimeServer:
         elif subscription_type == 'gtfsrt-vehicle-positions':
             adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic), self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             #adapter.process_vehicle_positions(message.topic, message.payload)
+
+    def _on_disconnect(self, client, userdata, flags, rc, properties):
+        logger = logging.getLogger('uvicorn')
+
+        # unsubscribe all MQTT topics
+        for subscription in self._config['mqtt']['subscriptions']:
+            logger.info(f"Unsubscribing topic {subscription['topic']} ({subscription['type']})")
+            self._mqtt.unsubscribe(subscription['topic'])
 
     def _get_subscription_type(self, topic):
         f=lambda s,p:p in(s,'#')or p[:1]in(s[:1],'+')and f(s[1:],p['+'!=p[:1]or(s[:1]in'/')*2:])
@@ -223,6 +262,12 @@ class GtfsLakeRealtimeServer:
 
             logger.info(f"Found {len(self._nominal_trips_ids)} unique trips")
     
+    def _execute_realtime_queues(self):
+        logger = logging.getLogger('uvicorn')
+
+        logger.info('Executing realtime queues ...')
+        self._lake_mqtt._execute_realtime_queues(self._config['app']['data_review_seconds'])
+
     async def _service_alerts(self, request: Request) -> Response:
 
         # check whether there're cached data
@@ -300,7 +345,7 @@ class GtfsLakeRealtimeServer:
         # send response
         feed_message = self._create_feed_message(objects)
         if format  == 'json':
-            json_result = json.dumps(feed_message)
+            json_result = json.dumps(feed_message, indent=4)
 
             if self._cache is not None:
                 self._cache.set(f"{request.url.path}-{format}", json_result, self._config['caching']['caching_service_alerts_ttl_seconds'])
@@ -357,26 +402,28 @@ class GtfsLakeRealtimeServer:
                     stu['stop_id'] = stop_time_update['stop_id']
 
                 # build arrival time update
-                stu['arrival'] = dict()
-                if stop_time_update['arrival_time'] is not None:
-                    stu['arrival']['time'] = stop_time_update['arrival_time']
+                if stop_time_update['arrival_time'] is not None or stop_time_update['arrival_delay'] is not None:
+                    stu['arrival'] = dict()
+                    if stop_time_update['arrival_time'] is not None:
+                        stu['arrival']['time'] = stop_time_update['arrival_time']
 
-                if stop_time_update['arrival_delay'] is not None:
-                    stu['arrival']['delay'] = stop_time_update['arrival_delay']
+                    if stop_time_update['arrival_delay'] is not None:
+                        stu['arrival']['delay'] = stop_time_update['arrival_delay']
 
-                if stop_time_update['arrival_uncertainty'] is not None:
-                    stu['arrival']['uncertainty'] = stop_time_update['arrival_uncertainty']
+                    if stop_time_update['arrival_uncertainty'] is not None:
+                        stu['arrival']['uncertainty'] = stop_time_update['arrival_uncertainty']
 
                 # build departure time update
-                stu['departure'] = dict()
-                if stop_time_update['departure_time'] is not None:
-                    stu['departure']['time'] = stop_time_update['departure_time']
+                if stop_time_update['departure_time'] is not None or stop_time_update['departure_delay'] is not None:
+                    stu['departure'] = dict()
+                    if stop_time_update['departure_time'] is not None:
+                        stu['departure']['time'] = stop_time_update['departure_time']
 
-                if stop_time_update['departure_delay'] is not None:
-                    stu['departure']['delay'] = stop_time_update['departure_delay']
+                    if stop_time_update['departure_delay'] is not None:
+                        stu['departure']['delay'] = stop_time_update['departure_delay']
 
-                if stop_time_update['departure_uncertainty'] is not None:
-                    stu['departure']['uncertainty'] = stop_time_update['departure_uncertainty']
+                    if stop_time_update['departure_uncertainty'] is not None:
+                        stu['departure']['uncertainty'] = stop_time_update['departure_uncertainty']
 
                 stu['schedule_relationship'] = stop_time_update['schedule_relationship']
 
@@ -387,7 +434,7 @@ class GtfsLakeRealtimeServer:
         # send response
         feed_message = self._create_feed_message(objects)
         if format  == 'json':
-            json_result = json.dumps(feed_message)
+            json_result = json.dumps(feed_message, indent=4)
 
             if self._cache is not None:
                 self._cache.set(f"{request.url.path}-{format}", json_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
@@ -469,7 +516,7 @@ class GtfsLakeRealtimeServer:
         # send response
         feed_message = self._create_feed_message(objects)
         if format  == 'json':
-            json_result = json.dumps(feed_message)
+            json_result = json.dumps(feed_message, indent=4)
 
             if self._cache is not None:
                 self._cache.set(f"{request.url.path}-{format}", json_result, self._config['caching']['caching_vehicle_positions_ttl_seconds'])
@@ -489,6 +536,7 @@ class GtfsLakeRealtimeServer:
         format = request.query_params['f'] if 'f' in request.query_params else 'html'
         date = request.query_params['d'] if 'd' in request.query_params else None
         realtime = True if 'r' in request.query_params else False
+        line = request.query_params['l'] if 'l' in request.query_params else None
         
         # create reference date
         reference = datetime.now()
@@ -501,9 +549,12 @@ class GtfsLakeRealtimeServer:
         # fetch data
         trips = self._lake.fetch_realtime_operation_day_monitor_trips(reference)
 
-        # filter for realtime available only, if requested
+        # apply filters here ...
         if realtime:
             trips = trips.filter(pl.col('realtime_available') == 'true')
+
+        if line is not None:
+            trips = trips.filter(pl.col('route_id') == line)
 
         # return results
         if format == 'json':
@@ -511,7 +562,7 @@ class GtfsLakeRealtimeServer:
         else:
             
             # generate viewable HTML table
-            table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>OperationDay</td><td>RouteID</td><td>TripID</td><td>TripHeadsign</td><td>DirectionID</td><td>StartStopID</td><td>StartStopName</td><td>StartTime</td><td>RealtimeAvailable</td></tr></thead><tbody>'
+            table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>OperationDay</td><td>AgencyID</td><td>RouteID</td><td>RouteShortName</td><td>TripID</td><td>DirectionID</td><td>StartTime</td><td>StartStopID</td><td>StartStopName</td><td>TripHeadsign</td><td>RealtimeAvailable</td><td>RealtimeLastUpdate</td></tr></thead><tbody>'
 
             for trip in trips.iter_rows(named=True):
                 if trip['realtime_available']:
@@ -519,7 +570,7 @@ class GtfsLakeRealtimeServer:
                 else:
                     style = 'style="background:red"'
                 
-                table = table + f'<tr><td>{trip['operation_day']}</td><td>{trip['route_id']}</td><td>{trip['trip_id']}</td><td>{trip['trip_headsign']}</td><td>{trip['direction_id']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['start_time']}</td><td {style}>{trip['realtime_available']}</td></tr>'
+                table = table + f"<tr><td>{trip['operation_day']}</td><td>{trip['agency_id']}</td><td>{trip['route_id']}</td><td>{trip['route_short_name']}</td><td>{trip['trip_id']}</td><td>{trip['direction_id']}</td><td>{trip['start_time']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['trip_headsign']}</td><td {style}>{trip['realtime_available']}</td><td>{trip['realtime_last_update']}</td></tr>"
                 
             table = table + '</tbody></table>'
 
@@ -531,7 +582,7 @@ class GtfsLakeRealtimeServer:
                     <meta charset="UTF-8" />
                 </head>
                 <body>
-                    <h1>gtfslake realtime server (version 0.1.0)</h1>
+                    <h1>gtfslake realtime server (version {__version__})</h1>
                     {table}
                 </body>
             </html>
