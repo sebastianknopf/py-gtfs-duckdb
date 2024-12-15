@@ -68,7 +68,7 @@ class GtfsLake:
             for txt_filename in gtfs_static_file.namelist():
                 if txt_filename.replace('.txt', '') in self.static_tables:
                     with io.TextIOWrapper(gtfs_static_file.open(txt_filename), encoding='utf-8') as txt_file:
-                        logging.info(f"loading {gtfs_static_filename}")
+                        logging.info(f"loading {txt_filename}")
                         
                         self._load_txt_file(txt_file, txt_filename.replace('.txt', ''))
 
