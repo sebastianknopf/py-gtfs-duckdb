@@ -265,7 +265,7 @@ class GtfsLake:
 
         # process trip updates
         while not self._realtime_trip_updates_delete_queue.empty():
-            trip_update, stop_time_updates = self._realtime_trip_update_queue.get()
+            trip_update, stop_time_updates = self._realtime_trip_updates_delete_queue.get()
 
             self._connection.execute('DELETE FROM realtime_trip_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
             self._connection.execute('DELETE FROM realtime_trip_stop_time_updates WHERE trip_update_id = ?', [trip_update['trip_update_id']])
