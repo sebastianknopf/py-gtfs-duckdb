@@ -209,10 +209,10 @@ class GtfsLakeRealtimeServer:
     def _get_subscription_mappings(self, topic):
         f=lambda s,p:p in(s,'#')or p[:1]in(s[:1],'+')and f(s[1:],p['+'!=p[:1]or(s[:1]in'/')*2:])
         for subscription in self._config['mqtt']['subscriptions']:
-            if f(topic, subscription['topic']):
+            if f(topic, subscription['topic']) and subscription['topic'] in self._mqtt_topic_mappings:
                 return self._mqtt_topic_mappings[subscription['topic']]
             
-        return None
+        return dict()
     
     def _read_mapping_csv_dict(self, csv_filename):
         result = dict()
