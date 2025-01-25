@@ -50,44 +50,43 @@ class GtfsRealtimeAdapter:
                         # check, whether the mapped IDs are contained in nominal ID list
                         # if there's no informed entity, remove the entire entity selector
                         # in general, only alerts with at least one valid entity selector should be imported
-                        if matching_entity.HasField('informed_entity'):
-                            deleted_entity_selectors = list()
-                            for i in range(0, len(matching_entity.informed_enity)):
-                                # map and verify route_id
-                                if matching_entity.informed_enity[i].HasField('route_id'):
-                                    route_id = matching_entity.informed_enity[i].route_id
-                                    if 'routes' in self._mappings and route_id in self._mappings['routes']:
-                                        matching_entity.informed_enity[i].route_id = self._mappings['routes'][route_id]
+                        deleted_entity_selectors = list()
+                        for i in range(0, len(matching_entity.alert.informed_entity)):
+                            # map and verify route_id
+                            if matching_entity.alert.informed_entity[i].HasField('route_id'):
+                                route_id = matching_entity.alert.informed_entity[i].route_id
+                                if 'routes' in self._mappings and route_id in self._mappings['routes']:
+                                    matching_entity.alert.informed_entity[i].route_id = self._mappings['routes'][route_id]
 
-                                    if matching_entity.informed_enity[i].route_id not in self._nominal_route_ids:
-                                        matching_entity.informed_enity[i].ClearField('route_id')
+                                if matching_entity.alert.informed_entity[i].route_id not in self._nominal_route_ids:
+                                    matching_entity.alert.informed_entity[i].ClearField('route_id')
 
-                                # map and verify stop_id
-                                if matching_entity.informed_enity[i].HasField('stop_id'):
-                                    stop_id = matching_entity.informed_enity[i].stop_id
-                                    if 'stops' in self._mappings and stop_id in self._mappings['stops']:
-                                        matching_entity.informed_enity[i].stop_id = self._mappings['stops'][stop_id]
-                        
-                                    if matching_entity.informed_enity[i].stop_id not in self._nominal_stop_ids:
-                                        matching_entity.informed_enity[i].ClearField('stop_id')
+                            # map and verify stop_id
+                            if matching_entity.alert.informed_entity[i].HasField('stop_id'):
+                                stop_id = matching_entity.alert.informed_entity[i].stop_id
+                                if 'stops' in self._mappings and stop_id in self._mappings['stops']:
+                                    matching_entity.alert.informed_entity[i].stop_id = self._mappings['stops'][stop_id]
+                    
+                                if matching_entity.alert.informed_entity[i].stop_id not in self._nominal_stop_ids:
+                                    matching_entity.alert.informed_entity[i].ClearField('stop_id')
 
-                                # TODO: what about the other fields of an entity selector ... ?
+                            # TODO: what about the other fields of an entity selector ... ?
 
-                                # mark entity selector as deleted, it contains no valid reference
-                                if not matching_entity.informed_enity[i].HasField('stop_id') and not matching_entity.informed_enity[i].HasField('stop_id'):
-                                    deleted_entity_selectors.append(i)
+                            # mark entity selector as deleted, it contains no valid reference
+                            if not matching_entity.alert.informed_entity[i].HasField('route_id') and not matching_entity.alert.informed_entity[i].HasField('route_id'):
+                                deleted_entity_selectors.append(i)
 
-                            # finally, delete all invalid entity selectors
-                            for d in deleted_entity_selectors:
-                                del matching_entity.informed_entity[d]
+                        # finally, delete all invalid entity selectors
+                        for d in deleted_entity_selectors:
+                            del matching_entity.alert.informed_entity[d]
 
-                            # if there's no entity selector left, skip this alert
-                            # we don't have any relation to an object in database
-                            if len(matching_entity.informed_entity):
-                                continue
+                        # if there's no entity selector left, skip this alert
+                        # we don't have any relation to an object in database
+                        if len(matching_entity.alert.informed_entity) == 0:
+                            continue
 
-                            # if everything is okay until here, insert the alert
-                            self._insert_service_alert(entity)
+                        # if everything is okay until here, insert the alert
+                        self._insert_service_alert(matching_entity)
                             
         except DecodeError:
             logger.info('DecodeError while processing GTFSRT message')
@@ -106,16 +105,16 @@ class GtfsRealtimeAdapter:
         alert_informed_entity_data = list()
 
         service_alert_data['service_alert_id'] = entity.id
-        service_alert_data['cause'] = entity.alert.cause if entity.alert.HasField('cause') else 'UNKNOWN_CAUSE'
-        service_alert_data['effect'] = entity.alert.effect if entity.alert.HasField('effect') else 'UNKNOWN_EFFECT'
-        service_alert_data['url'] = self._extract_translation_value(entity.alert.url.translation) if entity.alert.HasField('url') and entity.alert.url.HasField('translation') else None
-        service_alert_data['header_text'] = self._extract_translation_value(entity.alert.header_text.translation) if entity.alert.HasField('header_text') and entity.alert.header_text.HasField('translation') else None
-        service_alert_data['description_text'] = self._extract_translation_value(entity.alert.description_text.translation) if entity.alert.HasField('description_text') and entity.alert.description_text.HasField('translation') else None
-        service_alert_data['tts_header_text'] = self._extract_translation_value(entity.alert.tts_header_text.translation) if entity.alert.HasField('tts_header_text') and entity.alert.tts_header_text.HasField('translation') else None
-        service_alert_data['tts_description_text'] = self._extract_translation_value(entity.alert.tts_description_text.translation) if entity.alert.HasField('tts_description_text') and entity.alert.tts_description_text.HasField('translation') else None
+        service_alert_data['cause'] = gtfs_realtime_pb2.Alert.Cause.Name(entity.alert.cause)
+        service_alert_data['effect'] = gtfs_realtime_pb2.Alert.Effect.Name(entity.alert.effect)
+        service_alert_data['url'] = self._extract_translation_value(entity.alert.url.translation)
+        service_alert_data['header_text'] = self._extract_translation_value(entity.alert.header_text.translation)
+        service_alert_data['description_text'] = self._extract_translation_value(entity.alert.description_text.translation)
+        service_alert_data['tts_header_text'] = self._extract_translation_value(entity.alert.tts_header_text.translation)
+        service_alert_data['tts_description_text'] = self._extract_translation_value(entity.alert.tts_description_text.translation)
         service_alert_data['severity_level'] = entity.alert.severity_level if entity.alert.HasField('severity_level') else 'UNKNOWN_SEVERITY'
 
-        for ap in entity.alert.active_periods:
+        for ap in entity.alert.active_period:
             active_period_data = dict()
 
             active_period_data['service_alert_id'] = entity.id

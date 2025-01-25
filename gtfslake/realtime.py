@@ -2,6 +2,7 @@ import csv
 import json
 import logging
 import polars as pl
+import time
 import yaml
 
 from contextlib import asynccontextmanager
@@ -177,6 +178,56 @@ class GtfsLakeRealtimeServer:
                 self._mqtt.subscribe(subscription['topic'])
         else:
             logger.error(f"Failed to connect to MQTT broker with reason: {rc}")
+
+
+
+
+
+        testmsg = {
+            'header': {
+                'gtfs_realtime_version': '2.0',
+                'incrementality': 'DIFFERENTIAL',
+                'timestamp': int(time.time()) 
+            }, 
+            'entity': [{
+                'id': '20244d62-f7ad-485d-9b0d-6b0f47288688',
+                'is_deleted': True,
+                'alert': {
+                    'cause': 'ACCIDENT',
+                    'effect': 'SIGNIFICANT_DELAYS',
+                    'informed_entity': [{
+                        'route_id': '1'
+                    }, {
+                        'stop_id': '111'
+                    }],
+                    'url': {
+                        'translation': [{
+                            'language': 'de',
+                            'text': 'https://skc.dev'
+                        }]
+                    },
+                    'header_text': {
+                        'translation': [{
+                            'language': 'de',
+                            'text': 'Test Alert'
+                        }]
+                    },
+                    'description_text': {
+                        'translation': [{
+                            'language': 'de',
+                            'text': 'Test Alert for line nr. 1'
+                        }]
+                    }
+                }
+            }]
+        }
+
+        adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings('realtime/vpe/servicealerts/hhhhhsh'))
+        adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
+        adapter.process_service_alerts('realtime/vpe/servicealerts/hhhshhsh', ParseDict(
+            testmsg,
+            gtfs_realtime_pb2.FeedMessage()
+        ).SerializeToString())
 
     def _on_message(self, client: client.Client, userdata, message: client.MQTTMessage):   
         

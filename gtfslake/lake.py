@@ -169,10 +169,10 @@ class GtfsLake:
         self._connection.execute('DELETE FROM realtime_alert_informed_entities')
 
     def fetch_nominal_stops(self):
-        return self._connection.table('stops').select(duckdb.StarExpression())
+        return self._connection.table('stops').select(duckdb.StarExpression()).pl()
     
     def fetch_nominal_routes(self):
-        return self._connection.table('routes').select(duckdb.StarExpression())
+        return self._connection.table('routes').select(duckdb.StarExpression()).pl()
     
     def fetch_nominal_operation_day_trips(self, operation_day_date: dt.datetime, full_trips = False):
 
@@ -285,8 +285,12 @@ class GtfsLake:
             self._connection.execute('DELETE FROM realtime_alert_informed_entities WHERE service_alert_id = ?', [service_alert['service_alert_id']])
 
             self._insert('realtime_service_alerts', list(service_alert.keys()), list(service_alert.values()))
-            self._insert('realtime_alert_active_periods', [list(c.keys()) for c in alert_active_periods], [list(c.values()) for c in alert_active_periods])
-            self._insert('realtime_alert_informed_entities', [list(c.keys()) for c in alert_informed_entities], [list(c.values()) for c in alert_informed_entities])
+            
+            if len(alert_active_periods) > 0:
+                self._insert('realtime_alert_active_periods', [list(c.keys()) for c in alert_active_periods], [list(c.values()) for c in alert_active_periods], True)
+            
+            if len(alert_informed_entities) > 0:
+                self._insert('realtime_alert_informed_entities', [list(c.keys()) for c in alert_informed_entities], [list(c.values()) for c in alert_informed_entities], True)
         
         # process trip updates
         while not self._realtime_trip_updates_delete_queue.empty():
