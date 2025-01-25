@@ -132,7 +132,9 @@ class GtfsLakeRealtimeServer:
     async def _lifespan(self, app):
         logger = logging.getLogger('uvicorn')
 
-        # load nominal trips
+        # load nominal data
+        self._load_nominal_stops()
+        self._load_nominal_routes()
         self._load_nominal_trips(datetime.now())
 
         # start database realtime insert timer
@@ -181,13 +183,16 @@ class GtfsLakeRealtimeServer:
         # process message according to the topic type
         subscription_type = self._get_subscription_type(message.topic)
         if subscription_type == 'gtfsrt-service-alerts':
-            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic), self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
+            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
+            adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             #adapter.process_service_alerts(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-trip-updates':
-            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic), self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
+            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
+            adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             adapter.process_trip_updates(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-vehicle-positions':
-            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic), self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
+            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
+            adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             #adapter.process_vehicle_positions(message.topic, message.payload)
 
     def _on_disconnect(self, client, userdata, flags, rc, properties):
@@ -223,6 +228,18 @@ class GtfsLakeRealtimeServer:
                 result[row[0]] = row[1]
 
         return result
+    
+    def _load_nominal_stops(self):
+        logger = logging.getLogger('uvicorn')
+
+        logger.info('Creating nominal stop index ...')
+        self._nominal_stop_ids = list()
+
+    def _load_nominal_routes(self):
+        logger = logging.getLogger('uvicorn')
+
+        logger.info('Creating nominal route index ...')
+        self._nominal_route_ids = list()
 
     def _load_nominal_trips(self, dtoday: datetime):
         logger = logging.getLogger('uvicorn')

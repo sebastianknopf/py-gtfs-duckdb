@@ -6,14 +6,17 @@ from google.protobuf.message import DecodeError
 
 class GtfsRealtimeAdapter:
 
-    def __init__(self, config, lake, mappings, nominal_trips_ids, nominal_trips_start_times, nominal_trips_intermediate_stops):
+    def __init__(self, config, lake, mappings):
         self._lake = lake
         self._config = config
         self._mappings = mappings
 
-        self._nominal_trips_ids = nominal_trips_ids
-        self._nominal_trips_start_times = nominal_trips_start_times
-        self._nominal_trips_intermediate_stops = nominal_trips_intermediate_stops
+    def set_nominal_data(self, stop_ids, route_ids, trip_ids, trip_start_times, trips_intermediate_stops):
+        self._nominal_stop_ids = stop_ids
+        self._nominal_route_ids = route_ids
+        self._nominal_trips_ids = trip_ids
+        self._nominal_trips_start_times = trip_start_times
+        self._nominal_trips_intermediate_stops = trips_intermediate_stops
 
     def process_trip_updates(self, topic, payload):
         logger = logging.getLogger('uvicorn')
