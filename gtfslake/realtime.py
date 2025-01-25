@@ -185,7 +185,7 @@ class GtfsLakeRealtimeServer:
         if subscription_type == 'gtfsrt-service-alerts':
             adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
             adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
-            #adapter.process_service_alerts(message.topic, message.payload)
+            adapter.process_service_alerts(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-trip-updates':
             adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
             adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
@@ -233,13 +233,19 @@ class GtfsLakeRealtimeServer:
         logger = logging.getLogger('uvicorn')
 
         logger.info('Creating nominal stop index ...')
-        self._nominal_stop_ids = list()
+        self._nominal_stop_ids = pl.Series(
+            self._lake.fetch_nominal_stops()
+            .select('stop_id')
+        ).to_list()
 
     def _load_nominal_routes(self):
         logger = logging.getLogger('uvicorn')
 
         logger.info('Creating nominal route index ...')
-        self._nominal_route_ids = list()
+        self._nominal_route_ids = pl.Series(
+            self._lake.fetch_nominal_routes()
+            .select('route_id')
+        ).to_list()
 
     def _load_nominal_trips(self, dtoday: datetime):
         logger = logging.getLogger('uvicorn')

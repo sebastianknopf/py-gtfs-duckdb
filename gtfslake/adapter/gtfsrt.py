@@ -18,6 +18,42 @@ class GtfsRealtimeAdapter:
         self._nominal_trips_start_times = trip_start_times
         self._nominal_trips_intermediate_stops = trips_intermediate_stops
 
+    def process_service_alerts(self, topic, payload):
+        logger = logging.getLogger('uvicorn')
+
+        try:
+            feed_message = gtfs_realtime_pb2.FeedMessage()
+            feed_message.ParseFromString(payload)
+
+            # verify that the message is not older than review time in hours
+            if feed_message.HasField('header') and feed_message.header.HasField('timestamp'):
+                feed_message_timestamp = feed_message.header.timestamp
+                
+                if (int(time.time()) - feed_message_timestamp) > 60 * 60 * 2:
+                    logger.warning(f"Deprecated feed message for topic {topic} discarded")
+                    return
+
+            # process all entities of type alert
+            for entity in feed_message.entity:
+                if entity.HasField('alert'):
+                    logger.info('Alert')
+                
+        except DecodeError:
+            logger.info('DecodeError while processing GTFSRT message')
+
+    def _insert_service_alert(self, entity):
+        pass
+
+    def _delete_service_alert(self, entity):
+        pass
+
+    def _transform_service_alert(self, entity):
+        service_alert_data = dict()
+        alert_active_period_data = list()
+        alert_informed_entity_data = list()
+
+        return (service_alert_data, alert_active_period_data, alert_informed_entity_data)
+    
     def process_trip_updates(self, topic, payload):
         logger = logging.getLogger('uvicorn')
 
@@ -164,5 +200,3 @@ class GtfsRealtimeAdapter:
             trip_stop_time_update_data.append(stop_time_update_data)
 
         return (trip_update_data, trip_stop_time_update_data)
-
-

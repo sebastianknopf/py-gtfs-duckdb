@@ -125,8 +125,8 @@ class GtfsLake:
                     if os.path.exists(tmp_file):
                         os.remove(tmp_file)
 
-    def insert_realtime_service_alerts(self, service_alerts, alert_active_periods, alert_informed_entities):
-        pass
+    def insert_realtime_service_alert(self, service_alert, alert_active_periods, alert_informed_entities):
+        self._realtime_service_alerts_queue.put((service_alert, alert_active_periods, alert_informed_entities))
 
     def fetch_realtime_service_alerts(self):
 
@@ -135,6 +135,9 @@ class GtfsLake:
         alert_informed_entities = self._connection.table('realtime_alert_informed_entities').select(duckdb.StarExpression())
 
         return (service_alerts.pl(), alert_active_periods.pl(), alert_informed_entities.pl())
+
+    def delete_realtime_service_alert(self, service_alert, alert_active_periods, alert_informed_entities):
+        self._realtime_service_alerts_delete_queue.put((service_alert, alert_active_periods, alert_informed_entities))
 
     def insert_realtime_trip_updates(self, trip_update, stop_time_updates):
         self._realtime_trip_update_queue.put((trip_update, stop_time_updates))          
@@ -165,6 +168,12 @@ class GtfsLake:
         self._connection.execute('DELETE FROM realtime_alert_active_periods')
         self._connection.execute('DELETE FROM realtime_alert_informed_entities')
 
+    def fetch_nominal_stops(self):
+        return self._connection.table('stops').select(duckdb.StarExpression())
+    
+    def fetch_nominal_routes(self):
+        return self._connection.table('routes').select(duckdb.StarExpression())
+    
     def fetch_nominal_operation_day_trips(self, operation_day_date: dt.datetime, full_trips = False):
 
         opd_reference = operation_day_date.strftime("%Y%m%d")
@@ -255,14 +264,30 @@ class GtfsLake:
         delete_timestamp = delete_timestamp.strftime('%Y-%m-%d %H:%M:%S')
 
         # TODO: implement clearing routine for service alerts too
-
         self._connection.execute("DELETE FROM realtime_trip_updates WHERE last_updated_timestamp <= strptime(?, '%Y-%m-%d %H:%M:%S')", [delete_timestamp])
         self._connection.execute("DELETE FROM realtime_trip_stop_time_updates WHERE last_updated_timestamp <= strptime(?, '%Y-%m-%d %H:%M:%S')", [delete_timestamp])
 
         self._connection.execute("DELETE FROM realtime_vehicle_positions WHERE last_updated_timestamp <= strptime(?, '%Y-%m-%d %H:%M:%S')", [delete_timestamp])
 
         # process service alerts
+        while not self._realtime_service_alerts_delete_queue.empty():
+            service_alert, alert_active_periods, alert_informed_entities = self._realtime_service_alerts_delete_queue.get()
 
+            self._connection.execute('DELETE FROM realtime_service_alerts WHERE service_alert_id = ?', [service_alert['service_alert_id']])
+            self._connection.execute('DELETE FROM realtime_alert_active_periods WHERE service_alert_id = ?', [service_alert['service_alert_id']])
+            self._connection.execute('DELETE FROM realtime_alert_informed_entities WHERE service_alert_id = ?', [service_alert['service_alert_id']])
+        
+        while not self._realtime_service_alerts_queue.empty():
+            service_alert, alert_active_periods, alert_informed_entities = self._realtime_service_alerts_queue.get()
+
+            self._connection.execute('DELETE FROM realtime_service_alerts WHERE service_alert_id = ?', [service_alert['service_alert_id']])
+            self._connection.execute('DELETE FROM realtime_alert_active_periods WHERE service_alert_id = ?', [service_alert['service_alert_id']])
+            self._connection.execute('DELETE FROM realtime_alert_informed_entities WHERE service_alert_id = ?', [service_alert['service_alert_id']])
+
+            self._insert('realtime_service_alerts', list(service_alert.keys()), list(service_alert.values()))
+            self._insert('realtime_alert_active_periods', [list(c.keys()) for c in alert_active_periods], [list(c.values()) for c in alert_active_periods])
+            self._insert('realtime_alert_informed_entities', [list(c.keys()) for c in alert_informed_entities], [list(c.values()) for c in alert_informed_entities])
+        
         # process trip updates
         while not self._realtime_trip_updates_delete_queue.empty():
             trip_update, stop_time_updates = self._realtime_trip_updates_delete_queue.get()
