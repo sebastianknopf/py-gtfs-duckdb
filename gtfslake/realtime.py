@@ -2,6 +2,7 @@ import csv
 import json
 import logging
 import polars as pl
+import time
 import yaml
 
 from contextlib import asynccontextmanager
@@ -132,7 +133,9 @@ class GtfsLakeRealtimeServer:
     async def _lifespan(self, app):
         logger = logging.getLogger('uvicorn')
 
-        # load nominal trips
+        # load nominal data
+        self._load_nominal_stops()
+        self._load_nominal_routes()
         self._load_nominal_trips(datetime.now())
 
         # start database realtime insert timer
@@ -181,13 +184,16 @@ class GtfsLakeRealtimeServer:
         # process message according to the topic type
         subscription_type = self._get_subscription_type(message.topic)
         if subscription_type == 'gtfsrt-service-alerts':
-            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic), self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
-            #adapter.process_service_alerts(message.topic, message.payload)
+            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
+            adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
+            adapter.process_service_alerts(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-trip-updates':
-            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic), self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
+            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
+            adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             adapter.process_trip_updates(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-vehicle-positions':
-            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic), self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
+            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
+            adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             #adapter.process_vehicle_positions(message.topic, message.payload)
 
     def _on_disconnect(self, client, userdata, flags, rc, properties):
@@ -223,6 +229,24 @@ class GtfsLakeRealtimeServer:
                 result[row[0]] = row[1]
 
         return result
+    
+    def _load_nominal_stops(self):
+        logger = logging.getLogger('uvicorn')
+
+        logger.info('Creating nominal stop index ...')
+        self._nominal_stop_ids = pl.Series(
+            self._lake.fetch_nominal_stops()
+            .select('stop_id')
+        ).to_list()
+
+    def _load_nominal_routes(self):
+        logger = logging.getLogger('uvicorn')
+
+        logger.info('Creating nominal route index ...')
+        self._nominal_route_ids = pl.Series(
+            self._lake.fetch_nominal_routes()
+            .select('route_id')
+        ).to_list()
 
     def _load_nominal_trips(self, dtoday: datetime):
         logger = logging.getLogger('uvicorn')
@@ -295,6 +319,14 @@ class GtfsLakeRealtimeServer:
             obj['alert']['cause'] = service_alert['cause']
             obj['alert']['effect'] = service_alert['effect']
 
+            if service_alert['url'] is not None:
+                obj['alert']['url'] = dict()
+                obj['alert']['url']['translation'] = list()
+                obj['alert']['url']['translation'].append({
+                    'text': service_alert['url'],
+                    'language': 'de-DE'
+                })
+
             obj['alert']['header_text'] = dict()
             obj['alert']['header_text']['translation'] = list()
             obj['alert']['header_text']['translation'].append({
@@ -302,12 +334,28 @@ class GtfsLakeRealtimeServer:
                 'language': 'de-DE'
             })
 
+            if service_alert['tts_header_text'] is not None:
+                obj['alert']['tts_header_text'] = dict()
+                obj['alert']['tts_header_text']['translation'] = list()
+                obj['alert']['tts_header_text']['translation'].append({
+                    'text': service_alert['tts_header_text'],
+                    'language': 'de-DE'
+                })
+
             obj['alert']['description_text'] = dict()
             obj['alert']['description_text']['translation'] = list()
             obj['alert']['description_text']['translation'].append({
                 'text': service_alert['description_text'],
                 'language': 'de-DE'
             })
+
+            if service_alert['tts_description_text'] is not None:
+                obj['alert']['tts_description_text'] = dict()
+                obj['alert']['tts_description_text']['translation'] = list()
+                obj['alert']['tts_description_text']['translation'].append({
+                    'text': service_alert['tts_description_text'],
+                    'language': 'de-DE'
+                })
 
             obj['alert']['active_period'] = list()
             obj['alert']['informed_entity'] = list()

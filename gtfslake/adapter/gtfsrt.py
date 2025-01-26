@@ -6,15 +6,149 @@ from google.protobuf.message import DecodeError
 
 class GtfsRealtimeAdapter:
 
-    def __init__(self, config, lake, mappings, nominal_trips_ids, nominal_trips_start_times, nominal_trips_intermediate_stops):
+    def __init__(self, config, lake, mappings):
         self._lake = lake
         self._config = config
         self._mappings = mappings
 
-        self._nominal_trips_ids = nominal_trips_ids
-        self._nominal_trips_start_times = nominal_trips_start_times
-        self._nominal_trips_intermediate_stops = nominal_trips_intermediate_stops
+    def set_nominal_data(self, stop_ids, route_ids, trip_ids, trip_start_times, trips_intermediate_stops):
+        self._nominal_stop_ids = stop_ids
+        self._nominal_route_ids = route_ids
+        self._nominal_trips_ids = trip_ids
+        self._nominal_trips_start_times = trip_start_times
+        self._nominal_trips_intermediate_stops = trips_intermediate_stops
 
+    def process_service_alerts(self, topic, payload):
+        logger = logging.getLogger('uvicorn')
+
+        try:
+            feed_message = gtfs_realtime_pb2.FeedMessage()
+            feed_message.ParseFromString(payload)
+
+            # verify that the message is not older than review time in hours
+            if feed_message.HasField('header') and feed_message.header.HasField('timestamp'):
+                feed_message_timestamp = feed_message.header.timestamp
+                
+                if (int(time.time()) - feed_message_timestamp) > 60 * 60 * 2:
+                    logger.warning(f"Deprecated feed message for topic {topic} discarded")
+                    return
+
+            # process all entities of type alert
+            for entity in feed_message.entity:
+                if entity.HasField('alert'):
+                    matching_feed_message = gtfs_realtime_pb2.FeedMessage()
+                    matching_entity = matching_feed_message.entity.add()
+
+                    matching_entity.CopyFrom(entity)
+
+                    # check whether the entity is marked to be deleted actively
+                    # proceed, if the entity is not going to be deleted
+                    if matching_entity.HasField('is_deleted') and matching_entity.is_deleted:
+                        logger.info(f"Deleted existing service alert {matching_entity.id} of service alerts")
+                        self._delete_service_alert(entity)
+                    else:
+                        # map route and stop IDs
+                        # check, whether the mapped IDs are contained in nominal ID list
+                        # if there's no informed entity, remove the entire entity selector
+                        # in general, only alerts with at least one valid entity selector should be imported
+                        deleted_entity_selectors = list()
+                        for i in range(0, len(matching_entity.alert.informed_entity)):
+                            # map and verify route_id
+                            if matching_entity.alert.informed_entity[i].HasField('route_id'):
+                                route_id = matching_entity.alert.informed_entity[i].route_id
+                                if 'routes' in self._mappings and route_id in self._mappings['routes']:
+                                    matching_entity.alert.informed_entity[i].route_id = self._mappings['routes'][route_id]
+
+                                if matching_entity.alert.informed_entity[i].route_id not in self._nominal_route_ids:
+                                    matching_entity.alert.informed_entity[i].ClearField('route_id')
+
+                            # map and verify stop_id
+                            if matching_entity.alert.informed_entity[i].HasField('stop_id'):
+                                stop_id = matching_entity.alert.informed_entity[i].stop_id
+                                if 'stops' in self._mappings and stop_id in self._mappings['stops']:
+                                    matching_entity.alert.informed_entity[i].stop_id = self._mappings['stops'][stop_id]
+                    
+                                if matching_entity.alert.informed_entity[i].stop_id not in self._nominal_stop_ids:
+                                    matching_entity.alert.informed_entity[i].ClearField('stop_id')
+
+                            # TODO: what about the other fields of an entity selector ... ?
+
+                            # mark entity selector as deleted, it contains no valid reference
+                            if not matching_entity.alert.informed_entity[i].HasField('route_id') and not matching_entity.alert.informed_entity[i].HasField('route_id'):
+                                deleted_entity_selectors.append(i)
+
+                        # finally, delete all invalid entity selectors
+                        for d in deleted_entity_selectors:
+                            logger.warning(f"Removed entity selector [{d}] from service alert {matching_entity.id} as it contains no valid references")
+                            del matching_entity.alert.informed_entity[d]
+
+                        # if there's no entity selector left, skip this alert
+                        # we don't have any relation to an object in database
+                        if len(matching_entity.alert.informed_entity) == 0:
+                            logger.warning(f"Service alert {matching_entity.id} discarded as it contains no valid references")
+                            continue
+
+                        # if everything is okay until here, insert the alert
+                        logging.info(f"Added service alert {matching_entity.id} to service alerts")
+                        self._insert_service_alert(matching_entity)
+                            
+        except DecodeError:
+            logger.info('DecodeError while processing GTFSRT message')
+
+    def _insert_service_alert(self, entity):
+        service_alert, alert_active_periods, alert_informed_enities = self._transform_service_alert(entity)
+        self._lake.insert_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
+
+    def _delete_service_alert(self, entity):
+        service_alert, alert_active_periods, alert_informed_enities = self._transform_service_alert(entity)
+        self._lake.delete_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
+
+    def _transform_service_alert(self, entity):
+        service_alert_data = dict()
+        alert_active_period_data = list()
+        alert_informed_entity_data = list()
+
+        service_alert_data['service_alert_id'] = entity.id
+        service_alert_data['cause'] = gtfs_realtime_pb2.Alert.Cause.Name(entity.alert.cause)
+        service_alert_data['effect'] = gtfs_realtime_pb2.Alert.Effect.Name(entity.alert.effect)
+        service_alert_data['url'] = self._extract_translation_value(entity.alert.url.translation)
+        service_alert_data['header_text'] = self._extract_translation_value(entity.alert.header_text.translation)
+        service_alert_data['description_text'] = self._extract_translation_value(entity.alert.description_text.translation)
+        service_alert_data['tts_header_text'] = self._extract_translation_value(entity.alert.tts_header_text.translation)
+        service_alert_data['tts_description_text'] = self._extract_translation_value(entity.alert.tts_description_text.translation)
+        service_alert_data['severity_level'] = entity.alert.severity_level if entity.alert.HasField('severity_level') else 'UNKNOWN_SEVERITY'
+
+        for ap in entity.alert.active_period:
+            active_period_data = dict()
+
+            active_period_data['service_alert_id'] = entity.id
+            active_period_data['start_timestamp'] = ap.start if ap.HasField('start') else None
+            active_period_data['end_timestamp'] = ap.end if ap.HasField('end') else None
+        
+            alert_active_period_data.append(active_period_data)
+
+        for ie in entity.alert.informed_entity:
+            informed_entity_data = dict()
+
+            # TODO: implement all other fields of an entity selector here
+            informed_entity_data['service_alert_id'] = entity.id
+            informed_entity_data['route_id'] = ie.route_id if ie.HasField('route_id') else None
+            informed_entity_data['stop_id'] = ie.stop_id if ie.HasField('stop_id') else None
+
+            alert_informed_entity_data.append(informed_entity_data)
+
+        return (service_alert_data, alert_active_period_data, alert_informed_entity_data)
+    
+    def _extract_translation_value(self, translation_list, lang='de'):
+        for item in translation_list:
+            if item.language == lang:
+                return item.text
+            
+        if len(translation_list) > 0:
+            return translation_list[0].text
+        else:
+            return None
+    
     def process_trip_updates(self, topic, payload):
         logger = logging.getLogger('uvicorn')
 
@@ -64,7 +198,7 @@ class GtfsRealtimeAdapter:
                         
                     else: # if the trip ID does not exists, start matching here
                         if not matching_entity.trip_update.trip.HasField('start_time'):
-                            logger.warning(f"Trip {matching_entity.trip_update.trip.trip_id} as no start_time attribute and cannot be matched")
+                            logger.warning(f"Trip {matching_entity.trip_update.trip.trip_id} has no start_time attribute and cannot be matched")
                             return
                         
                         if matching_entity.trip_update.trip.route_id not in self._nominal_trips_start_times:
@@ -161,5 +295,3 @@ class GtfsRealtimeAdapter:
             trip_stop_time_update_data.append(stop_time_update_data)
 
         return (trip_update_data, trip_stop_time_update_data)
-
-
