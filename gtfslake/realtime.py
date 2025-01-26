@@ -191,7 +191,6 @@ class GtfsLakeRealtimeServer:
             }, 
             'entity': [{
                 'id': '20244d62-f7ad-485d-9b0d-6b0f47288688',
-                'is_deleted': True,
                 'alert': {
                     'cause': 'ACCIDENT',
                     'effect': 'SIGNIFICANT_DELAYS',
@@ -204,12 +203,21 @@ class GtfsLakeRealtimeServer:
                         'translation': [{
                             'language': 'de',
                             'text': 'https://skc.dev'
+                        }, {
+                            'language': 'en',
+                            'text': 'https://skc.dev/en'
                         }]
                     },
                     'header_text': {
                         'translation': [{
                             'language': 'de',
                             'text': 'Test Alert'
+                        }]
+                    },
+                    'tts_header_text': {
+                        'translation': [{
+                            'language': 'de',
+                            'text': 'Test Alert TTS'
                         }]
                     },
                     'description_text': {
@@ -369,6 +377,14 @@ class GtfsLakeRealtimeServer:
             obj['alert']['cause'] = service_alert['cause']
             obj['alert']['effect'] = service_alert['effect']
 
+            if service_alert['url'] is not None:
+                obj['alert']['url'] = dict()
+                obj['alert']['url']['translation'] = list()
+                obj['alert']['url']['translation'].append({
+                    'text': service_alert['url'],
+                    'language': 'de-DE'
+                })
+
             obj['alert']['header_text'] = dict()
             obj['alert']['header_text']['translation'] = list()
             obj['alert']['header_text']['translation'].append({
@@ -376,12 +392,28 @@ class GtfsLakeRealtimeServer:
                 'language': 'de-DE'
             })
 
+            if service_alert['tts_header_text'] is not None:
+                obj['alert']['tts_header_text'] = dict()
+                obj['alert']['tts_header_text']['translation'] = list()
+                obj['alert']['tts_header_text']['translation'].append({
+                    'text': service_alert['tts_header_text'],
+                    'language': 'de-DE'
+                })
+
             obj['alert']['description_text'] = dict()
             obj['alert']['description_text']['translation'] = list()
             obj['alert']['description_text']['translation'].append({
                 'text': service_alert['description_text'],
                 'language': 'de-DE'
             })
+
+            if service_alert['tts_description_text'] is not None:
+                obj['alert']['tts_description_text'] = dict()
+                obj['alert']['tts_description_text']['translation'] = list()
+                obj['alert']['tts_description_text']['translation'].append({
+                    'text': service_alert['tts_description_text'],
+                    'language': 'de-DE'
+                })
 
             obj['alert']['active_period'] = list()
             obj['alert']['informed_entity'] = list()

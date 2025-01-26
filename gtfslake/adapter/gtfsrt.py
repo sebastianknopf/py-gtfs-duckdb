@@ -44,6 +44,7 @@ class GtfsRealtimeAdapter:
                     # check whether the entity is marked to be deleted actively
                     # proceed, if the entity is not going to be deleted
                     if matching_entity.HasField('is_deleted') and matching_entity.is_deleted:
+                        logger.info(f"Deleted existing service alert {matching_entity.id} of service alerts")
                         self._delete_service_alert(entity)
                     else:
                         # map route and stop IDs
@@ -78,14 +79,17 @@ class GtfsRealtimeAdapter:
 
                         # finally, delete all invalid entity selectors
                         for d in deleted_entity_selectors:
+                            logger.warning(f"Removed entity selector [{d}] from service alert {matching_entity.id} as it contains no valid references")
                             del matching_entity.alert.informed_entity[d]
 
                         # if there's no entity selector left, skip this alert
                         # we don't have any relation to an object in database
                         if len(matching_entity.alert.informed_entity) == 0:
+                            logger.warning(f"Service alert {matching_entity.id} discarded as it contains no valid references")
                             continue
 
                         # if everything is okay until here, insert the alert
+                        logging.info(f"Added service alert {matching_entity.id} to service alerts")
                         self._insert_service_alert(matching_entity)
                             
         except DecodeError:
@@ -118,8 +122,8 @@ class GtfsRealtimeAdapter:
             active_period_data = dict()
 
             active_period_data['service_alert_id'] = entity.id
-            active_period_data['start_timestamp'] = ap.start_timestamp if ap.HasField('start_timestamp') else None
-            active_period_data['end_timestamp'] = ap.end_timestamp if ap.HasField('end_timestamp') else None
+            active_period_data['start_timestamp'] = ap.start if ap.HasField('start') else None
+            active_period_data['end_timestamp'] = ap.end if ap.HasField('end') else None
         
             alert_active_period_data.append(active_period_data)
 
@@ -194,7 +198,7 @@ class GtfsRealtimeAdapter:
                         
                     else: # if the trip ID does not exists, start matching here
                         if not matching_entity.trip_update.trip.HasField('start_time'):
-                            logger.warning(f"Trip {matching_entity.trip_update.trip.trip_id} as no start_time attribute and cannot be matched")
+                            logger.warning(f"Trip {matching_entity.trip_update.trip.trip_id} has no start_time attribute and cannot be matched")
                             return
                         
                         if matching_entity.trip_update.trip.route_id not in self._nominal_trips_start_times:
