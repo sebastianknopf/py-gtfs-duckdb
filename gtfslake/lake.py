@@ -263,7 +263,9 @@ class GtfsLake:
         delete_timestamp = dt.datetime.now() - dt.timedelta(seconds=data_review_seconds)
         delete_timestamp = delete_timestamp.strftime('%Y-%m-%d %H:%M:%S')
 
-        # TODO: implement clearing routine for service alerts too
+        # service are not cleared by their last update timestamp as service alerts and remain
+        # for a longer time unchanged in the database - they do not need to be updated every few seconds
+
         self._connection.execute("DELETE FROM realtime_trip_updates WHERE last_updated_timestamp <= strptime(?, '%Y-%m-%d %H:%M:%S')", [delete_timestamp])
         self._connection.execute("DELETE FROM realtime_trip_stop_time_updates WHERE last_updated_timestamp <= strptime(?, '%Y-%m-%d %H:%M:%S')", [delete_timestamp])
 
