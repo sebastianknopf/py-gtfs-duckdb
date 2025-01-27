@@ -196,6 +196,17 @@ class GtfsLake:
 
         return (trips.join(stop_ids, "stop_times.trip_id = trips.trip_id").order("trips.trip_id, stop_times.stop_sequence").pl())
     
+    def fetch_realtime_monitor_alerts(self):
+        result_columns = [
+            duckdb.ColumnExpression('service_alert_id'),
+            duckdb.ColumnExpression('cause'),
+            duckdb.ColumnExpression('effect'),
+            duckdb.ColumnExpression('header_text'),
+            duckdb.ColumnExpression('description_text')
+        ]
+
+        return self._connection.table('realtime_service_alerts').select(*result_columns).pl()
+    
     def fetch_realtime_operation_day_monitor_trips(self, operation_day_date: dt.datetime):
         opd_reference = operation_day_date.strftime("%Y%m%d")
         opd_dayname = operation_day_date.strftime("%A").lower()
