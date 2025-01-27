@@ -89,7 +89,7 @@ class GtfsRealtimeAdapter:
                             continue
 
                         # if everything is okay until here, insert the alert
-                        logging.info(f"Added service alert {matching_entity.id} to service alerts")
+                        logger.info(f"Added service alert {matching_entity.id} to service alerts")
                         self._insert_service_alert(matching_entity)
                             
         except DecodeError:

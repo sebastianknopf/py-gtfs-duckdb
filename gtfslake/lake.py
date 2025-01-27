@@ -196,6 +196,17 @@ class GtfsLake:
 
         return (trips.join(stop_ids, "stop_times.trip_id = trips.trip_id").order("trips.trip_id, stop_times.stop_sequence").pl())
     
+    def fetch_realtime_monitor_alerts(self):
+        result_columns = [
+            duckdb.ColumnExpression('service_alert_id'),
+            duckdb.ColumnExpression('cause'),
+            duckdb.ColumnExpression('effect'),
+            duckdb.ColumnExpression('header_text'),
+            duckdb.ColumnExpression('description_text')
+        ]
+
+        return self._connection.table('realtime_service_alerts').select(*result_columns).pl()
+    
     def fetch_realtime_operation_day_monitor_trips(self, operation_day_date: dt.datetime):
         opd_reference = operation_day_date.strftime("%Y%m%d")
         opd_dayname = operation_day_date.strftime("%A").lower()
@@ -206,7 +217,12 @@ class GtfsLake:
         calendar_date_removed_ids = self._connection.table('calendar_dates').filter(f"date = {opd_reference} AND exception_type = '2'").select(duckdb.ColumnExpression('service_id'))
 
         service_ids = calendar_ids.union(calendar_date_added_ids).except_(calendar_date_removed_ids).fetchall()
-        service_ids = list(zip(*service_ids))[0]
+        service_ids = list(zip(*service_ids))
+
+        if len(service_ids) > 0:
+            service_ids = service_ids[0]
+        else:
+            service_ids = []
 
         # get all trips with stop times for matching services        
         trips = self._connection.table('trips').select(duckdb.StarExpression()).filter(duckdb.ColumnExpression('service_id').isin(*[duckdb.ConstantExpression(s) for s in service_ids]))

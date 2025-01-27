@@ -595,6 +595,7 @@ class GtfsLakeRealtimeServer:
                 pass
 
         # fetch data
+        alerts = self._lake.fetch_realtime_monitor_alerts()
         trips = self._lake.fetch_realtime_operation_day_monitor_trips(reference)
 
         # apply filters here ...
@@ -606,11 +607,24 @@ class GtfsLakeRealtimeServer:
 
         # return results
         if format == 'json':
-            return Response(content=trips.write_json(), media_type='application/json')
+            json_object = {
+                'alerts': alerts.to_dicts(),
+                'trips': trips.to_dicts()
+            }
+
+            return Response(content=json.dumps(json_object, indent=4, default=str), media_type='application/json')
         else:
             
-            # generate viewable HTML table
-            table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>OperationDay</td><td>AgencyID</td><td>RouteID</td><td>RouteShortName</td><td>TripID</td><td>DirectionID</td><td>StartTime</td><td>StartStopID</td><td>StartStopName</td><td>TripHeadsign</td><td>RealtimeAvailable</td><td>RealtimeLastUpdate</td></tr></thead><tbody>'
+             # generate viewable alerts HTML table
+            alerts_table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>Entity ID</td><td>Cause</td><td>Effect</td><td>Header</td><td>Description</td></tr></thead><tbody>'
+
+            for alert in alerts.iter_rows(named=True):
+                alerts_table = alerts_table + f"<tr><td>{alert['service_alert_id']}</td><td>{alert['cause']}</td><td>{alert['effect']}</td><td>{alert['header_text']}</td><td>{alert['description_text']}</td></tr>"
+
+            alerts_table = alerts_table + '</tbody></table>'
+
+            # generate viewable trips HTML table
+            trips_table = '<table width="100%" cellpadding="4" cellspacing="2" border="1"><thead style="font-weight:bold"><tr><td>OperationDay</td><td>AgencyID</td><td>RouteID</td><td>RouteShortName</td><td>TripID</td><td>DirectionID</td><td>StartTime</td><td>StartStopID</td><td>StartStopName</td><td>TripHeadsign</td><td>RealtimeAvailable</td><td>RealtimeLastUpdate</td></tr></thead><tbody>'
 
             for trip in trips.iter_rows(named=True):
                 if trip['realtime_available']:
@@ -618,9 +632,9 @@ class GtfsLakeRealtimeServer:
                 else:
                     style = 'style="background:red"'
                 
-                table = table + f"<tr><td>{trip['operation_day']}</td><td>{trip['agency_id']}</td><td>{trip['route_id']}</td><td>{trip['route_short_name']}</td><td>{trip['trip_id']}</td><td>{trip['direction_id']}</td><td>{trip['start_time']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['trip_headsign']}</td><td {style}>{trip['realtime_available']}</td><td>{trip['realtime_last_update']}</td></tr>"
+                trips_table = trips_table + f"<tr><td>{trip['operation_day']}</td><td>{trip['agency_id']}</td><td>{trip['route_id']}</td><td>{trip['route_short_name']}</td><td>{trip['trip_id']}</td><td>{trip['direction_id']}</td><td>{trip['start_time']}</td><td>{trip['start_stop_id']}</td><td>{trip['start_stop_name']}</td><td>{trip['trip_headsign']}</td><td {style}>{trip['realtime_available']}</td><td>{trip['realtime_last_update']}</td></tr>"
                 
-            table = table + '</tbody></table>'
+            trips_table = trips_table + '</tbody></table>'
 
             # wrap with very basic html
             html = f"""
@@ -631,7 +645,10 @@ class GtfsLakeRealtimeServer:
                 </head>
                 <body>
                     <h1>gtfslake realtime server (version {__version__})</h1>
-                    {table}
+                    <h2>Alerts</h2>
+                    {alerts_table}
+                    <h2>Trips</h2>
+                    {trips_table}
                 </body>
             </html>
             """
