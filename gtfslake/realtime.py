@@ -657,7 +657,7 @@ class GtfsLakeRealtimeServer:
             return Response(content=html, media_type='text/html')
 
     def _create_feed_message(self, entities):
-        timestamp = datetime.now().astimezone(pytz.timezone('Europe/Berlin')).timestamp()
+        timestamp = datetime.now().astimezone(pytz.timezone(self._config['app']['timezone'])).timestamp()
         timestamp = floor(timestamp)
         
         return {
