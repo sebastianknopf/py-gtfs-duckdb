@@ -7,5 +7,6 @@ polars
 protobuf
 pyarrow
 python-memcached
+pytz
 pyyaml
 uvicorn

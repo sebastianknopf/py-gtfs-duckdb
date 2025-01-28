@@ -2,7 +2,7 @@ import csv
 import json
 import logging
 import polars as pl
-import time
+import pytz
 import yaml
 
 from contextlib import asynccontextmanager
@@ -63,6 +63,7 @@ class GtfsLakeRealtimeServer:
             self._config['app']['routing']['monitor_endpoint'] = '/monitor'
 
             self._config['app']['data_review_seconds'] = 600
+            self._config['app']['timezone'] = 'Europe/Berlin'
 
             self._config['caching']['caching_server_endpoint'] = ''
             self._config['caching']['caching_service_alerts_ttl_seconds'] = 60
@@ -656,11 +657,14 @@ class GtfsLakeRealtimeServer:
             return Response(content=html, media_type='text/html')
 
     def _create_feed_message(self, entities):
+        timestamp = datetime.now().astimezone(pytz.timezone('Europe/Berlin')).timestamp()
+        timestamp = floor(timestamp)
+        
         return {
             'header': {
                 'gtfs_realtime_version': '2.0',
                 'incrementality': 'FULL_DATASET',
-                'timestamp': floor(datetime.utcnow().timestamp())
+                'timestamp': timestamp
             },
             'entity': entities
         }
