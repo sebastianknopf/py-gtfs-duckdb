@@ -9,6 +9,7 @@ app:
     vehicle_positions_endpoint: /gtfs/realtime/vehicle-positions.pbf
     monitor_endpoint: /monitor
   data_review_seconds: 7200
+  timezone: 'Europe/Berlin'
 caching:
   caching_server_endpoint: [MemcachedServerInstance]
   caching_service_alerts_ttl_seconds: 60
