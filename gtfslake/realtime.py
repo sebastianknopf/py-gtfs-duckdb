@@ -481,6 +481,10 @@ class GtfsLakeRealtimeServer:
             objects.append(obj)
 
         # send response
+
+        # see #17 for purpose - this feature is only for making debugging easier
+        objects = sorted(objects, key=lambda e: f"{e['trip_update']['trip']['start_date']}-{e['trip_update']['trip']['start_time']}")
+
         feed_message = self._create_feed_message(objects)
         if format  == 'json':
             json_result = json.dumps(feed_message, indent=4)
