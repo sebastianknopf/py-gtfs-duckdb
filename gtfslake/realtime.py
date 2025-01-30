@@ -478,7 +478,9 @@ class GtfsLakeRealtimeServer:
 
                 obj['trip_update']['stop_time_update'].append(stu)
 
-            objects.append(obj)
+            # see #16, some trip updates do obviously not contain some stop time updates and are invalid
+            if len(obj['trip_update']['stop_time_update']) > 0:
+                objects.append(obj)
 
         # send response
 
