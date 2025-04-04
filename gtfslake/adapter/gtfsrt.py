@@ -223,7 +223,7 @@ class GtfsRealtimeAdapter:
                                     if stu.stop_sequence != 1:
                                         continue
 
-                                if stu.stop_sequence >= len(self._nominal_trips_intermediate_stops[candidate]):
+                                if stu.stop_sequence > len(self._nominal_trips_intermediate_stops[candidate]):
                                     logger.warning(f"Could not match trip {entity.trip_update.trip.trip_id} due to nominal stop number mismatch")
                                     intermediate_stops_matching = False
                                     break
