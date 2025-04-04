@@ -242,7 +242,7 @@ class GtfsRealtimeAdapter:
                                         break
 
                             # finally delete discarded stop time updates
-                            for d in deleted_stop_time_updates:
+                            for d in sorted(deleted_stop_time_updates, reverse=True):
                                 del matching_entity.trip_update.stop_time_update[d]
 
                             # if all intermediate stops matching, the whole trip matches
