@@ -18,6 +18,7 @@ caching:
 matching:
   match_against_first_stop_id: true
   match_against_stop_ids: false
+  remove_invalid_stop_ids: true
 mqtt:
   host: test.mosquitto.org
   port: 1883
