@@ -214,11 +214,12 @@ class GtfsRealtimeAdapter:
 
                             # check whether stop time updates match the nominal intermediate stops
                             intermediate_stops_matching = True
-                            for stu in matching_entity.trip_update.stop_time_update:
-                                if not self._config['matching']['match_against_first_stop_id'] and not self._config['matching']['match_against_stop_ids']:
+                            deleted_stop_time_updates = list()
+                            for i, stu in enumerate(matching_entity.trip_update.stop_time_update):
+                                if not self._config['matching']['match_against_first_stop_id'] and not self._config['matching']['match_against_stop_ids'] and not self._config['matching']['remove_invalid_stop_ids']:
                                     break
 
-                                if self._config['matching']['match_against_first_stop_id'] and not self._config['matching']['match_against_stop_ids']:
+                                if self._config['matching']['match_against_first_stop_id'] and not (self._config['matching']['match_against_stop_ids'] or self._config['matching']['remove_invalid_stop_ids']):
                                     if stu.stop_sequence != 1:
                                         continue
 
@@ -231,10 +232,20 @@ class GtfsRealtimeAdapter:
                                 act_id = stu.stop_id
                                 nom_id = self._nominal_trips_intermediate_stops[candidate][max(0, stu_index)]
                                 if not nom_id == act_id:
-                                    logger.warning(f"Could not match trip {entity.trip_update.trip.trip_id} due to an intermediate stop mismatch (nom: seq={stu_index},id={nom_id}; act: seq={stu_index},id={act_id})")
-                                    intermediate_stops_matching = False
-                                    break
+                                    if self._config['matching']['remove_invalid_stop_ids']:
+                                        logger.warning(f"Discarded stop time update for trip {entity.trip_update.trip.trip_id} due to mismatch (nom: seq={stu_index},id={nom_id}; act: seq={stu_index},id={act_id})")
+                                        deleted_stop_time_updates.append(i)
 
+                                    if self._config['matching']['match_against_stop_ids']:
+                                        logger.warning(f"Could not match trip {entity.trip_update.trip.trip_id} due to an intermediate stop mismatch (nom: seq={stu_index},id={nom_id}; act: seq={stu_index},id={act_id})")
+                                        intermediate_stops_matching = False
+                                        break
+
+                            # finally delete discarded stop time updates
+                            for d in deleted_stop_time_updates:
+                                del matching_entity.trip_update.stop_time_update[d]
+
+                            # if all intermediate stops matching, the whole trip matches
                             if intermediate_stops_matching:
                                 trip_id_matched = True
                                 break
