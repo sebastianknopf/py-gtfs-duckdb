@@ -6,8 +6,9 @@ import uvicorn
 import datetime as dt
 import polars as pl
 
-from gtfslake.lake import GtfsLake
-from gtfslake.realtime import GtfsLakeRealtimeServer
+from gtfsduckdb.ddb import GtfsDuckDB
+from gtfsduckdb.realtime import GtfsRealtimeServer
+from gtfsduckdb.version import __version__
 
 
 logging.basicConfig(
@@ -21,11 +22,15 @@ def cli():
     pass
 
 @cli.command()
+def version():
+    print(__version__)
+
+@cli.command()
 @click.argument('database')
 @click.option('--input', '-i', help='Directory or ZIP file containing GTFS data')
 def load(database, input):
 
-    lake = GtfsLake(database)
+    lake = GtfsDuckDB(database)
     lake.load_static(input)
 
 @cli.command()
@@ -35,7 +40,7 @@ def load(database, input):
 @click.option('--trips', '-t', multiple=True, help='Pattern matching the trip IDs to be removed')
 def remove(database, agencies, routes, trips):
 
-    lake = GtfsLake(database)
+    lake = GtfsDuckDB(database)
 
     for agency in agencies:
         lake.remove_agencies(agency, False)
@@ -50,11 +55,11 @@ def remove(database, agencies, routes, trips):
 
 @cli.command()
 @click.argument('database')
-@click.option('--inputs', '-i', multiple=True, help='Filename of the DDB subset which should be dropped to the lake')
-@click.option('--strategy', '-s', default='match_stop_id', help='Strategy used for matching existing data between the lake and the subset')
+@click.option('--inputs', '-i', multiple=True, help='Filename of the DDB subset which should be dropped to the actual database')
+@click.option('--strategy', '-s', default='match_stop_id', help='Strategy used for matching existing data between the actual database and the subset')
 def drop(database, inputs, strategy):
     
-    lake = GtfsLake(database)
+    lake = GtfsDuckDB(database)
 
     for subset in inputs:
         lake.drop_subset(subset, strategy_name=strategy)
@@ -64,7 +69,7 @@ def drop(database, inputs, strategy):
 @click.option('--output', '-o', help='Destination directory or ZIP file containing GTFS data')
 def export(database, output):
     
-    lake = GtfsLake(database)
+    lake = GtfsDuckDB(database)
     lake.export_static(output)
 
 @cli.command()
@@ -72,7 +77,7 @@ def export(database, output):
 @click.option('--files', '-f', multiple=True, help='Filename of the file containing SQL statements')
 def sql(database, files):
 
-    lake = GtfsLake(database)
+    lake = GtfsDuckDB(database)
 
     for sql_file in files:
         lake.execute_sql(sql_file)
@@ -87,7 +92,7 @@ def show(database, date, num_results, full_trips, output):
 
     ref = dt.datetime.strptime(date, '%Y%m%d')
     
-    lake = GtfsLake(database)
+    lake = GtfsDuckDB(database)
 
     start_time = time.time()
     trips = lake.fetch_nominal_operation_day_trips(ref, full_trips)
@@ -109,7 +114,7 @@ def show(database, date, num_results, full_trips, output):
 @click.option('--config', '-c', default=None, help='Additional configuration file for realtime server')
 def realtime(database, config, host, port):
 
-    realtime = GtfsLakeRealtimeServer(database, config)
+    realtime = GtfsRealtimeServer(database, config)
     uvicorn.run(app=realtime.create(), host=host, port=int(port))
 
 if __name__ == '__main__':

@@ -20,23 +20,22 @@ from paho.mqtt import client
 from typing import Any
 from threading import Thread
 
-from gtfslake.lake import GtfsLake
-from gtfslake.repeatedtimer import RepeatedTimer
-from gtfslake.adapter.gtfsrt import GtfsRealtimeAdapter
+from gtfsduckdb.ddb import GtfsDuckDB
+from gtfsduckdb.repeatedtimer import RepeatedTimer
+from gtfsduckdb.adapter.gtfsrt import GtfsRealtimeAdapter
+from gtfsduckdb.version import version
 
-from gtfslake.__version__ import __version__
-
-class GtfsLakeRealtimeServer:
+class GtfsRealtimeServer:
 
     def __init__(self, database_filename: str, config_filename: str|None):
 
         self._database_filename = database_filename
 
 		# connect to GTFS lake database
-        self._lake = GtfsLake(database_filename)
+        self._lake = GtfsDuckDB(database_filename)
 
         # connect to GTFS lake database a second time for independent writing purposes
-        self._lake_mqtt = GtfsLake(database_filename)
+        self._lake_mqtt = GtfsDuckDB(database_filename)
         self._lake_mqtt_timer = RepeatedTimer(15, self._execute_realtime_queues)
 
         # create cache container for nominal trips
@@ -651,7 +650,7 @@ class GtfsLakeRealtimeServer:
                     <meta charset="UTF-8" />
                 </head>
                 <body>
-                    <h1>gtfslake realtime server (version {__version__})</h1>
+                    <h1>gtfslake realtime server (version {version})</h1>
                     <h2>Alerts</h2>
                     {alerts_table}
                     <h2>Trips</h2>
