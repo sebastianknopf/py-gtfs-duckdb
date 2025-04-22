@@ -20,6 +20,7 @@ from paho.mqtt import client
 from typing import Any
 from threading import Thread
 
+from gtfsduckdb.config import Configuration
 from gtfsduckdb.ddb import GtfsDuckDB
 from gtfsduckdb.repeatedtimer import RepeatedTimer
 from gtfsduckdb.adapter.gtfsrt import GtfsRealtimeAdapter
@@ -31,12 +32,12 @@ class GtfsRealtimeServer:
 
         self._database_filename = database_filename
 
-		# connect to GTFS lake database
-        self._lake = GtfsDuckDB(database_filename)
+		# connect to GTFS ddb database
+        self._ddb = GtfsDuckDB(database_filename)
 
-        # connect to GTFS lake database a second time for independent writing purposes
-        self._lake_mqtt = GtfsDuckDB(database_filename)
-        self._lake_mqtt_timer = RepeatedTimer(15, self._execute_realtime_queues)
+        # connect to GTFS ddb database a second time for independent writing purposes
+        self._ddb_mqtt = GtfsDuckDB(database_filename)
+        self._ddb_mqtt_timer = RepeatedTimer(15, self._execute_realtime_queues)
 
         # create cache container for nominal trips
         self._nominal_trips = None
@@ -47,38 +48,10 @@ class GtfsRealtimeServer:
         if config_filename is not None:
             with open(config_filename, 'r') as config_file:
                 self._config = yaml.safe_load(config_file)
+            
+            self._config = Configuration.default_config(self._config)
         else:
-            self._config = dict()
-            self._config['app'] = dict()
-            self._config['app']['caching_enabled'] = False
-            self._config['app']['monitor_enabled'] = True
-            self._config['app']['cors_enabled'] = False
-            self._config['app']['mqtt_enabled'] = False
-
-            self._config['app']['routing'] = dict()
-            self._config['app']['routing']['service_alerts_endpoint'] = '/gtfs/realtime/service-alerts.pbf'
-            self._config['app']['routing']['trip_updates_endpoint'] = '/gtfs/realtime/trip-updates.pbf'
-            self._config['app']['routing']['vehicle_positions_endpoint'] = '/gtfs/realtime/vehicle-positions.pbf'
-            self._config['app']['routing']['monitor_endpoint'] = '/monitor'
-
-            self._config['app']['data_review_seconds'] = 600
-            self._config['app']['timezone'] = 'Europe/Berlin'
-
-            self._config['caching']['caching_server_endpoint'] = ''
-            self._config['caching']['caching_service_alerts_ttl_seconds'] = 60
-            self._config['caching']['caching_trip_updates_ttl_seconds'] = 30
-            self._config['caching']['caching_vehicle_positions_ttl_seconds'] = 15
-
-            self._config['matching']['match_against_first_stop_id'] = True
-            self._config['matching']['match_against_stop_ids'] = False
-
-            self._config['mqtt']['host'] = ''
-            self._config['mqtt']['port'] = ''
-            self._config['mqtt']['client'] = 'gtfslake-realtime-default-client'
-            self._config['mqtt']['keepalive'] = 60
-            self._config['mqtt']['username'] = None
-            self._config['mqtt']['password'] = None
-            self._config['mqtt']['subscriptions'] = list()
+            self._config = Configuration.default_config(dict())
 
         # create data notification client
         if self._config['app']['mqtt_enabled']:
@@ -139,12 +112,12 @@ class GtfsRealtimeServer:
         self._load_nominal_trips(datetime.now())
 
         # start database realtime insert timer
-        self._lake_mqtt_timer.start()
+        self._ddb_mqtt_timer.start()
 
         # delete existing realtime data in order to avoid deprecated data
         # since data are only loaded from MQTT broker as retained messages,
         # they sould be restored after server startup, if they're still valid
-        self._lake.clear_realtime_data()
+        self._ddb.clear_realtime_data()
 
         logger.info('Started realtime data insert timer with interval of 15s')
 
@@ -164,7 +137,7 @@ class GtfsRealtimeServer:
         logger.info(f"Disconnected from MQTT {self._config['mqtt']['host']}:{self._config['mqtt']['port']}")
 
         # stop database realtime insert timer
-        self._lake_mqtt_timer.stop()
+        self._ddb_mqtt_timer.stop()
 
         logger.info('Stopped realtime data insert timer')
 
@@ -184,15 +157,15 @@ class GtfsRealtimeServer:
         # process message according to the topic type
         subscription_type = self._get_subscription_type(message.topic)
         if subscription_type == 'gtfsrt-service-alerts':
-            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
+            adapter = GtfsRealtimeAdapter(self._config, self._ddb_mqtt, self._get_subscription_mappings(message.topic))
             adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             adapter.process_service_alerts(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-trip-updates':
-            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
+            adapter = GtfsRealtimeAdapter(self._config, self._ddb_mqtt, self._get_subscription_mappings(message.topic))
             adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             adapter.process_trip_updates(message.topic, message.payload)
         elif subscription_type == 'gtfsrt-vehicle-positions':
-            adapter = GtfsRealtimeAdapter(self._config, self._lake_mqtt, self._get_subscription_mappings(message.topic))
+            adapter = GtfsRealtimeAdapter(self._config, self._ddb_mqtt, self._get_subscription_mappings(message.topic))
             adapter.set_nominal_data(self._nominal_stop_ids, self._nominal_route_ids, self._nominal_trips_ids, self._nominal_trips_start_times, self._nominal_trips_intermediate_stops)
             #adapter.process_vehicle_positions(message.topic, message.payload)
 
@@ -235,7 +208,7 @@ class GtfsRealtimeServer:
 
         logger.info('Creating nominal stop index ...')
         self._nominal_stop_ids = pl.Series(
-            self._lake.fetch_nominal_stops()
+            self._ddb.fetch_nominal_stops()
             .select('stop_id')
         ).to_list()
 
@@ -244,7 +217,7 @@ class GtfsRealtimeServer:
 
         logger.info('Creating nominal route index ...')
         self._nominal_route_ids = pl.Series(
-            self._lake.fetch_nominal_routes()
+            self._ddb.fetch_nominal_routes()
             .select('route_id')
         ).to_list()
 
@@ -257,7 +230,7 @@ class GtfsRealtimeServer:
             logger.info('Creating nominal trip index ...')
 
             self._nominal_trips_reference = reference
-            self._nominal_trips = self._lake.fetch_nominal_operation_day_trips(dtoday, True)
+            self._nominal_trips = self._ddb.fetch_nominal_operation_day_trips(dtoday, True)
 
             self._nominal_trips_ids = pl.Series(self._nominal_trips.select('trip_id').unique()).to_list()
             
@@ -290,7 +263,7 @@ class GtfsRealtimeServer:
         logger = logging.getLogger('uvicorn')
 
         logger.info('Executing realtime queues ...')
-        self._lake_mqtt._execute_realtime_queues(self._config['app']['data_review_seconds'])
+        self._ddb_mqtt._execute_realtime_queues(self._config['app']['data_review_seconds'])
 
     async def _service_alerts(self, request: Request) -> Response:
 
@@ -307,7 +280,7 @@ class GtfsRealtimeServer:
                 return Response(content=cached_response, media_type=mime_type)
 
         # if there're no data cached, fetch and create them
-        service_alerts, alert_active_periods, alert_informed_entities = self._lake.fetch_realtime_service_alerts()
+        service_alerts, alert_active_periods, alert_informed_entities = self._ddb.fetch_realtime_service_alerts()
 
         objects = list()
         for service_alert in service_alerts.iter_rows(named=True):
@@ -422,7 +395,7 @@ class GtfsRealtimeServer:
                 return Response(content=cached_response, media_type=mime_type)
 
         # if nothing is cached, fetch trip updates
-        trip_updates, trip_stop_time_updates = self._lake.fetch_realtime_trip_updates()
+        trip_updates, trip_stop_time_updates = self._ddb.fetch_realtime_trip_updates()
 
         objects = list()
         for trip_update in trip_updates.iter_rows(named=True):
@@ -518,7 +491,7 @@ class GtfsRealtimeServer:
                 return Response(content=cached_response, media_type=mime_type)
 
         # if nothing is cached, fetch trip updates
-        vehicle_positions = self._lake.fetch_realtime_vehicle_positions()
+        vehicle_positions = self._ddb.fetch_realtime_vehicle_positions()
 
         objects = list()
         for vehicle_position in vehicle_positions.iter_rows(named=True):
@@ -601,8 +574,8 @@ class GtfsRealtimeServer:
                 pass
 
         # fetch data
-        alerts = self._lake.fetch_realtime_monitor_alerts()
-        trips = self._lake.fetch_realtime_operation_day_monitor_trips(reference)
+        alerts = self._ddb.fetch_realtime_monitor_alerts()
+        trips = self._ddb.fetch_realtime_operation_day_monitor_trips(reference)
 
         # apply filters here ...
         if realtime:
@@ -650,7 +623,7 @@ class GtfsRealtimeServer:
                     <meta charset="UTF-8" />
                 </head>
                 <body>
-                    <h1>gtfslake realtime server (version {version})</h1>
+                    <h1>gtfsduckdb realtime server (version {version})</h1>
                     <h2>Alerts</h2>
                     {alerts_table}
                     <h2>Trips</h2>
