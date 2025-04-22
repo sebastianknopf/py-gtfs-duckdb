@@ -208,5 +208,5 @@ pip-selfcheck.json
 
 
 # Project specific
-
+src/gtfsduckdb/version.py
 /sampledata/*

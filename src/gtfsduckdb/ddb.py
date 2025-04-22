@@ -12,9 +12,9 @@ import datetime as dt
 
 from queue import Queue
 
-import gtfslake.ddbdef
+import gtfsduckdb.ddbdef
 
-class GtfsLake:
+class GtfsDuckDB:
 
     def __init__(self, database_filename, read_only_flag=False):
         self._connection = duckdb.connect(database=database_filename, read_only=read_only_flag)
@@ -55,12 +55,12 @@ class GtfsLake:
         if not read_only_flag:
             # generate static tables
             for static_table in self.static_tables:
-                create_stmt = gtfslake.ddbdef.schema[static_table]
+                create_stmt = gtfsduckdb.ddbdef.schema[static_table]
                 self._connection.execute(create_stmt)
 
             # generate realtime tables
             for realtime_table in self.realtime_tables:
-                create_stmt = gtfslake.ddbdef.schema[realtime_table]
+                create_stmt = gtfsduckdb.ddbdef.schema[realtime_table]
                 self._connection.execute(create_stmt)
 
     def load_static(self, gtfs_static_filename):
@@ -185,7 +185,12 @@ class GtfsLake:
         calendar_date_removed_ids = self._connection.table('calendar_dates').filter(f"date = {opd_reference} AND exception_type = '2'").select(duckdb.ColumnExpression('service_id'))
 
         service_ids = calendar_ids.union(calendar_date_added_ids).except_(calendar_date_removed_ids).fetchall()
-        service_ids = list(zip(*service_ids))[0]
+        service_ids = list(zip(*service_ids))
+
+        if len(service_ids) > 0:
+            service_ids = service_ids[0]
+        else:
+            service_ids = []
 
         # get all trips with stop times for matching services        
         trips = self._connection.table('trips').select(duckdb.StarExpression()).filter(duckdb.ColumnExpression('service_id').isin(*[duckdb.ConstantExpression(s) for s in service_ids]))
