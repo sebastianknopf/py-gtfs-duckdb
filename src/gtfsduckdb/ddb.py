@@ -55,12 +55,12 @@ class GtfsDuckDB:
         if not read_only_flag:
             # generate static tables
             for static_table in self.static_tables:
-                create_stmt = src.ddbdef.schema[static_table]
+                create_stmt = gtfsduckdb.ddbdef.schema[static_table]
                 self._connection.execute(create_stmt)
 
             # generate realtime tables
             for realtime_table in self.realtime_tables:
-                create_stmt = src.ddbdef.schema[realtime_table]
+                create_stmt = gtfsduckdb.ddbdef.schema[realtime_table]
                 self._connection.execute(create_stmt)
 
     def load_static(self, gtfs_static_filename):
