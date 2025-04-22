@@ -185,7 +185,12 @@ class GtfsDuckDB:
         calendar_date_removed_ids = self._connection.table('calendar_dates').filter(f"date = {opd_reference} AND exception_type = '2'").select(duckdb.ColumnExpression('service_id'))
 
         service_ids = calendar_ids.union(calendar_date_added_ids).except_(calendar_date_removed_ids).fetchall()
-        service_ids = list(zip(*service_ids))[0]
+        service_ids = list(zip(*service_ids))
+
+        if len(service_ids) > 0:
+            service_ids = service_ids[0]
+        else:
+            service_ids = []
 
         # get all trips with stop times for matching services        
         trips = self._connection.table('trips').select(duckdb.StarExpression()).filter(duckdb.ColumnExpression('service_id').isin(*[duckdb.ConstantExpression(s) for s in service_ids]))
