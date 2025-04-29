@@ -74,7 +74,7 @@ class GtfsRealtimeAdapter:
                             # TODO: what about the other fields of an entity selector ... ?
 
                             # mark entity selector as deleted, it contains no valid reference
-                            if not matching_entity.alert.informed_entity[i].HasField('route_id') and not matching_entity.alert.informed_entity[i].HasField('route_id'):
+                            if not matching_entity.alert.informed_entity[i].HasField('route_id') and not matching_entity.alert.informed_entity[i].HasField('stop_id'):
                                 deleted_entity_selectors.append(i)
 
                         # finally, delete all invalid entity selectors
