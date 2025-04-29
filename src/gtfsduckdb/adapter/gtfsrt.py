@@ -80,6 +80,7 @@ class GtfsRealtimeAdapter:
                         # finally, delete all invalid entity selectors
                         for d in sorted(deleted_entity_selectors, reverse=True):
                             logger.warning(f"Removed entity selector [{d}] from service alert {matching_entity.id} as it contains no valid references")
+                            logger.debug(f"Entity selector index {d}, size is {len(matching_entity.alert.informed_entity)}")
                             del matching_entity.alert.informed_entity[d]
 
                         # if there's no entity selector left, skip this alert
