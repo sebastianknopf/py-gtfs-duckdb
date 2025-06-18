@@ -30,8 +30,8 @@ def version():
 @click.option('--input', '-i', help='Directory or ZIP file containing GTFS data')
 def load(database, input):
 
-    lake = GtfsDuckDB(database)
-    lake.load_static(input)
+    ddb = GtfsDuckDB(database)
+    ddb.load_static(input)
 
 @cli.command()
 @click.argument('database')
@@ -40,18 +40,18 @@ def load(database, input):
 @click.option('--trips', '-t', multiple=True, help='Pattern matching the trip IDs to be removed')
 def remove(database, agencies, routes, trips):
 
-    lake = GtfsDuckDB(database)
+    ddb = GtfsDuckDB(database)
 
     for agency in agencies:
-        lake.remove_agencies(agency, False)
+        ddb.remove_agencies(agency, False)
     
     for route in routes:
-        lake.remove_routes(route, False)
+        ddb.remove_routes(route, False)
 
     for trip in trips:
-        lake.remove_trips(trip, False)
+        ddb.remove_trips(trip, False)
 
-    lake._remove_dependent_objects()
+    ddb._remove_dependent_objects()
 
 @cli.command()
 @click.argument('database')
@@ -59,28 +59,28 @@ def remove(database, agencies, routes, trips):
 @click.option('--strategy', '-s', default='match_stop_id', help='Strategy used for matching existing data between the actual database and the subset')
 def drop(database, inputs, strategy):
     
-    lake = GtfsDuckDB(database)
+    ddb = GtfsDuckDB(database)
 
     for subset in inputs:
-        lake.drop_subset(subset, strategy_name=strategy)
+        ddb.drop_subset(subset, strategy_name=strategy)
 
 @cli.command()
 @click.argument('database')
 @click.option('--output', '-o', help='Destination directory or ZIP file containing GTFS data')
 def export(database, output):
     
-    lake = GtfsDuckDB(database)
-    lake.export_static(output)
+    ddb = GtfsDuckDB(database)
+    ddb.export_static(output)
 
 @cli.command()
 @click.argument('database')
 @click.option('--files', '-f', multiple=True, help='Filename of the file containing SQL statements')
 def sql(database, files):
 
-    lake = GtfsDuckDB(database)
+    ddb = GtfsDuckDB(database)
 
     for sql_file in files:
-        lake.execute_sql(sql_file)
+        ddb.execute_sql(sql_file)
 
 @cli.command()
 @click.argument('database')
@@ -92,10 +92,10 @@ def show(database, date, num_results, full_trips, output):
 
     ref = dt.datetime.strptime(date, '%Y%m%d')
     
-    lake = GtfsDuckDB(database)
+    ddb = GtfsDuckDB(database)
 
     start_time = time.time()
-    trips = lake.fetch_nominal_operation_day_trips(ref, full_trips)
+    trips = ddb.fetch_nominal_operation_day_trips(ref, full_trips)
     end_time = time.time()
 
     if output is not None:
