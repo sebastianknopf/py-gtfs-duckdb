@@ -3,10 +3,12 @@ app:
   monitor_enabled: true
   cors_enabled: true
   mqtt_enabled: true
+  rss_enabled: false
   routing:
     service_alerts_endpoint: /gtfs/realtime/service-alerts.pbf
     trip_updates_endpoint: /gtfs/realtime/trip-updates.pbf
     vehicle_positions_endpoint: /gtfs/realtime/vehicle-positions.pbf
+    rss_endpoint: /gtfs/realtime/rss.xml
     monitor_endpoint: /monitor
   data_review_seconds: 7200
   timezone: 'Europe/Berlin'
@@ -36,3 +38,7 @@ mqtt:
       type: gtfsrt-trip-updates
     - topic: realtime/sample/vehiclepositions/#
       type: gtfsrt-vehicle-positions
+rss:
+  title: Demo Public Transport Alerts
+  description: All public transport alerts in realtime as RSS feed.
+  language: de-DE
