@@ -7,6 +7,7 @@ import yaml
 
 from contextlib import asynccontextmanager
 from datetime import datetime
+from datetime import timezone
 from fastapi import APIRouter
 from fastapi import FastAPI
 from fastapi import Request
@@ -22,6 +23,7 @@ from threading import Thread
 
 from gtfsduckdb.config import Configuration
 from gtfsduckdb.ddb import GtfsDuckDB
+from gtfsduckdb.dict2xml import dict2xml
 from gtfsduckdb.repeatedtimer import RepeatedTimer
 from gtfsduckdb.adapter.gtfsrt import GtfsRealtimeAdapter
 from gtfsduckdb.version import version
@@ -82,6 +84,9 @@ class GtfsRealtimeServer:
         self._api_router.add_api_route(self._config['app']['routing']['trip_updates_endpoint'], endpoint=self._trip_updates, methods=['GET'], name='trip_updates')
         self._api_router.add_api_route(self._config['app']['routing']['vehicle_positions_endpoint'], endpoint=self._vehicle_positions, methods=['GET'], name='vehicle_positions')
 
+        if self._config['app']['rss_enabled']:
+            self._api_router.add_api_route(self._config['app']['routing']['rss_endpoint'], endpoint=self._rss, methods=['GET'], name='rss')
+        
         if self._config['app']['monitor_enabled']:
             self._api_router.add_api_route(self._config['app']['routing']['monitor_endpoint'], endpoint=self._monitor, methods=['GET'], name='monitor')
 
@@ -633,6 +638,51 @@ class GtfsRealtimeServer:
             """
             
             return Response(content=html, media_type='text/html')
+        
+    def _rss(self):
+
+        rss = {
+            '#version': '2.0',
+            #'#xmlns:atom': 'http://www.w3.org/2005/Atom',
+            'channel': {
+                'title': self._config['rss']['title'],
+                'description': self._config['rss']['description'],
+                'language': self._config['rss']['language'],
+                'item': list()
+            }
+        }
+
+        # fetch data and convert them to RSS format
+        service_alerts, alert_active_periods, alert_informed_entities = self._ddb.fetch_realtime_service_alerts()
+
+        for service_alert in service_alerts.iter_rows(named=True):
+            title: str = service_alert['header_text']
+            link: str = service_alert['url']
+            guid: str = service_alert['service_alert_id']
+            
+            active_periods = alert_active_periods.filter(pl.col('service_alert_id') == service_alert['service_alert_id'])
+            if len(active_periods) > 0:
+                start_time: datetime = datetime.fromtimestamp(int(active_periods['start_timestamp'].to_list()[0]), tz=timezone.utc)
+                pub_date: str = start_time.strftime('%a, %d %b %Y %H:%M:%S %z')
+            else:
+                pub_date: str = 'null'
+            
+            description: str = service_alert['description_text']
+
+            rss['channel']['item'].append({
+                'title': title,
+                'link': link,
+                'guid': guid,
+                'pubDate': pub_date,
+                'description': f"<![CDATA[{description}]]>"
+            })
+
+        return Response(content=dict2xml(
+            'rss',
+            rss,
+            pretty_print=True
+        ), media_type='application/rss+xml')
+
 
     def _create_feed_message(self, entities):
         timestamp = datetime.now().astimezone(pytz.timezone(self._config['app']['timezone'])).timestamp()
