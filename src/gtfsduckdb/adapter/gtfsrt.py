@@ -9,8 +9,8 @@ from ..mapping import map_id
 
 class GtfsRealtimeAdapter:
 
-    def __init__(self, config, lake, mappings):
-        self._lake = lake
+    def __init__(self, config, ddb, mappings):
+        self._ddb = ddb
         self._config = config
         self._mappings = mappings
 
@@ -106,11 +106,11 @@ class GtfsRealtimeAdapter:
 
     def _insert_service_alert(self, entity):
         service_alert, alert_active_periods, alert_informed_enities = self._transform_service_alert(entity)
-        self._lake.insert_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
+        self._ddb.insert_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
 
     def _delete_service_alert(self, entity):
         service_alert, alert_active_periods, alert_informed_enities = self._transform_service_alert(entity)
-        self._lake.delete_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
+        self._ddb.delete_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
 
     def _transform_service_alert(self, entity):
         service_alert_data = dict()
@@ -279,11 +279,11 @@ class GtfsRealtimeAdapter:
 
     def _insert_trip_update(self, entity):
         trip_update_data, trip_stop_time_update_data = self._transform_trip_update(entity)
-        self._lake.insert_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
+        self._ddb.insert_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
 
     def _delete_trip_update(self, entity):
         trip_update_data, trip_stop_time_update_data = self._transform_trip_update(entity)
-        self._lake.delete_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
+        self._ddb.delete_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
 
     def _transform_trip_update(self, entity):
         trip_update_data = dict()
