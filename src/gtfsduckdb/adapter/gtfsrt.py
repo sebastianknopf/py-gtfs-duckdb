@@ -60,6 +60,8 @@ class GtfsRealtimeAdapter:
                             if matching_entity.alert.informed_entity[i].HasField('route_id'):
                                 route_id = matching_entity.alert.informed_entity[i].route_id
                                 if 'routes' in self._mappings:
+                                    logging.info('Mapping route ID now ...')
+                                    logging.info(f"{route_id} ---> {map_id(route_id, self._mappings['routes'])}")
                                     matching_entity.alert.informed_entity[i].route_id = map_id(route_id, self._mappings['routes'])
                                 else:
                                     logging.warning(f'No mapping for {matching_entity.id}')
