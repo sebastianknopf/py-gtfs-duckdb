@@ -2,9 +2,9 @@ import re
 
 def map_id(id:str, mapping:dict) -> str|None:
 
-    rgx: str = id.replace('*', '.*')
     for key, value in mapping.items():
-        if re.match(rgx, key):
+        rgx: str = key.replace('*', '.*')
+        if re.match(rgx, id):
             return value
         
     return None
