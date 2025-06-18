@@ -1,13 +1,16 @@
 import logging
+import re
 import time
 
 from google.transit import gtfs_realtime_pb2
 from google.protobuf.message import DecodeError
 
+from ..mapping import map_id
+
 class GtfsRealtimeAdapter:
 
-    def __init__(self, config, lake, mappings):
-        self._lake = lake
+    def __init__(self, config, ddb, mappings):
+        self._ddb = ddb
         self._config = config
         self._mappings = mappings
 
@@ -56,8 +59,8 @@ class GtfsRealtimeAdapter:
                             # map and verify route_id
                             if matching_entity.alert.informed_entity[i].HasField('route_id'):
                                 route_id = matching_entity.alert.informed_entity[i].route_id
-                                if 'routes' in self._mappings and route_id in self._mappings['routes']:
-                                    matching_entity.alert.informed_entity[i].route_id = self._mappings['routes'][route_id]
+                                if 'routes' in self._mappings:
+                                    matching_entity.alert.informed_entity[i].route_id = map_id(route_id, self._mappings['routes'])
 
                                 if matching_entity.alert.informed_entity[i].route_id not in self._nominal_route_ids:
                                     matching_entity.alert.informed_entity[i].ClearField('route_id')
@@ -65,8 +68,8 @@ class GtfsRealtimeAdapter:
                             # map and verify stop_id
                             if matching_entity.alert.informed_entity[i].HasField('stop_id'):
                                 stop_id = matching_entity.alert.informed_entity[i].stop_id
-                                if 'stops' in self._mappings and stop_id in self._mappings['stops']:
-                                    matching_entity.alert.informed_entity[i].stop_id = self._mappings['stops'][stop_id]
+                                if 'stops' in self._mappings:
+                                    matching_entity.alert.informed_entity[i].stop_id = map_id(stop_id, self._mappings['stops'])
                     
                                 if matching_entity.alert.informed_entity[i].stop_id not in self._nominal_stop_ids:
                                     matching_entity.alert.informed_entity[i].ClearField('stop_id')
@@ -97,11 +100,11 @@ class GtfsRealtimeAdapter:
 
     def _insert_service_alert(self, entity):
         service_alert, alert_active_periods, alert_informed_enities = self._transform_service_alert(entity)
-        self._lake.insert_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
+        self._ddb.insert_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
 
     def _delete_service_alert(self, entity):
         service_alert, alert_active_periods, alert_informed_enities = self._transform_service_alert(entity)
-        self._lake.delete_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
+        self._ddb.delete_realtime_service_alert(service_alert, alert_active_periods, alert_informed_enities)
 
     def _transform_service_alert(self, entity):
         service_alert_data = dict()
@@ -176,13 +179,13 @@ class GtfsRealtimeAdapter:
 
                     # map route and stop IDs
                     route_id = matching_entity.trip_update.trip.route_id if matching_entity.trip_update.HasField('trip') and matching_entity.trip_update.trip.HasField('route_id') else None
-                    if 'routes' in self._mappings and route_id in self._mappings['routes']:
-                        matching_entity.trip_update.trip.route_id = self._mappings['routes'][route_id]
+                    if 'routes' in self._mappings:
+                        matching_entity.trip_update.trip.route_id = map_id(route_id, self._mappings['routes'])
 
                     for stop_time_update in matching_entity.trip_update.stop_time_update:
                         stop_id = stop_time_update.stop_id if stop_time_update.HasField('stop_id') else None
                         if 'stops' in self._mappings and stop_id in self._mappings['stops']:
-                            stop_time_update.stop_id = self._mappings['stops'][stop_id]
+                            stop_time_update.stop_id = map_id(stop_id, self._mappings['stops'])
 
                     # check whether the trip is already known or must be matched
                     if matching_entity.trip_update.trip.trip_id in self._nominal_trips_ids: # if the trip ID is already known from nominal trip IDs
@@ -270,11 +273,11 @@ class GtfsRealtimeAdapter:
 
     def _insert_trip_update(self, entity):
         trip_update_data, trip_stop_time_update_data = self._transform_trip_update(entity)
-        self._lake.insert_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
+        self._ddb.insert_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
 
     def _delete_trip_update(self, entity):
         trip_update_data, trip_stop_time_update_data = self._transform_trip_update(entity)
-        self._lake.delete_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
+        self._ddb.delete_realtime_trip_updates(trip_update_data, trip_stop_time_update_data)
 
     def _transform_trip_update(self, entity):
         trip_update_data = dict()

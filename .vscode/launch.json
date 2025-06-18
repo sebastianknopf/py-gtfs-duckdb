@@ -1,0 +1,23 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug: Realtime",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gtfsduckdb",
+            "python": "${workspaceFolder}/venv/Scripts/python.exe",
+            "env": {"PYTHONPATH": "${workspaceRoot}/src"},
+            "args": [
+                "realtime",
+                "./sampledata/gtfs.ddb",
+                "-p", "8030",
+                "-h", "127.0.0.1",
+                "-c", "./sampledata/gtfsduckdb-realtime.yaml"
+            ]
+        }
+    ]
+}
