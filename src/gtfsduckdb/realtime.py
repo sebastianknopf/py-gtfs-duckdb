@@ -268,7 +268,7 @@ class GtfsRealtimeServer:
     async def _service_alerts(self, request: Request) -> Response:
 
         # check whether there're cached data
-        format = request.query_params['f'] if 'f' in request.query_params else 'pbf'
+        format = 'json' if 'debug' in request.query_params else 'pbf'
         if self._cache is not None:
             cached_response = self._cache.get(f"{request.url.path}-{format}")
             if cached_response is not None:
@@ -383,7 +383,7 @@ class GtfsRealtimeServer:
     async def _trip_updates(self, request: Request) -> Response:
 
         # check whether there're cached data
-        format = request.query_params['f'] if 'f' in request.query_params else 'pbf'
+        format = 'json' if 'debug' in request.query_params else 'pbf'
         if self._cache is not None:
             cached_response = self._cache.get(f"{request.url.path}-{format}")
             if cached_response is not None:
@@ -479,7 +479,7 @@ class GtfsRealtimeServer:
     async def _vehicle_positions(self, request: Request) -> Response:
 
         # check whether there're cached data
-        format = request.query_params['f'] if 'f' in request.query_params else 'pbf'
+        format = 'json' if 'debug' in request.query_params else 'pbf'
         if self._cache is not None:
             cached_response = self._cache.get(f"{request.url.path}-{format}")
             if cached_response is not None:
