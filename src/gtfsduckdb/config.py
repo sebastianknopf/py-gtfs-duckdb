@@ -45,7 +45,9 @@ class Configuration:
             'rss': {
                 'title': 'Demo Public Transport Alerts',
                 'description': 'All public transport alerts in realtime as RSS feed.',
-                'language': 'de-DE'
+                'language': 'de-DE',
+                'base_url': 'https://yourdomain.dev',
+                'media_url': 'https://yourdomain.dev/media/default.jpg'
             }
         }
 
