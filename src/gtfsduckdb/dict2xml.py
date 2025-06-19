@@ -38,7 +38,7 @@ def _build_xml_element(parent, d, wrap_lists, nsmap):
                             _build_xml_element(child, item, wrap_lists, nsmap)
                     else:
                         for item in value:
-                            name = item['$name']
+                            name = item['$name'] if '$name' in item else key
 
                             if '$ns' in item and item['$ns'] in nsmap:
                                 ns_url: str = nsmap[item['$ns']]
