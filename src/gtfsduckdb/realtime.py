@@ -643,11 +643,16 @@ class GtfsRealtimeServer:
 
         rss = {
             '#version': '2.0',
-            #'#xmlns:atom': 'http://www.w3.org/2005/Atom',
             'channel': {
                 'title': self._config['rss']['title'],
                 'description': self._config['rss']['description'],
                 'language': self._config['rss']['language'],
+                'link': {
+                    '$ns': 'atom',
+                    '#href': f"{self._config['rss']['base_url']}{self._config['app']['routing']['rss_endpoint']}",
+                    '#rel': 'self',
+                    '#type': 'application/rss+xml'
+                },
                 'item': list()
             }
         }
@@ -674,13 +679,24 @@ class GtfsRealtimeServer:
                 'link': link,
                 'guid': guid,
                 'pubDate': pub_date,
-                'description': f"<![CDATA[{description}]]>"
+                'description': f"<![CDATA[{description}]]>",
+                'content': {
+                    '$ns': 'media',
+                    '#url': f"{self._config['rss']['media_url']}",
+                    '#medium': 'image'
+                }
             })
+
+        namespaces: dict = {
+            'atom': 'http://www.w3.org/2005/Atom',
+            'media': 'http://search.yahoo.com/mrss/'
+        }
 
         return Response(content=dict2xml(
             'rss',
             rss,
-            pretty_print=True
+            pretty_print=True,
+            nsmap=namespaces
         ), media_type='application/rss+xml')
 
 
