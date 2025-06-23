@@ -1,0 +1,21 @@
+name: Build Release
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch: # allow manual start
+
+jobs:
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Important: Allow to modify the repository
+    steps:
+      - name: checkout-repository
+        uses: actions/checkout@v4
+      - name: create-gh-release
+        run: |
+          gh release create ${{ github.ref_name }} --generate-notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
