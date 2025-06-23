@@ -557,7 +557,7 @@ class GtfsRealtimeServer:
             
             return Response(content=html, media_type='text/html')
         
-    def _rss(self):
+    async def _rss(self):
 
         rss = {
             '#version': '2.0',
