@@ -11,10 +11,12 @@ class Configuration:
                 'monitor_enabled': True,
                 'cors_enabled': True,
                 'mqtt_enabled': True,
+                'rss_enabled': False,
                 'routing': {
                     'service_alerts_endpoint': '/gtfs/realtime/service-alerts.pbf',
                     'trip_updates_endpoint': '/gtfs/realtime/trip-updates.pbf',
                     'vehicle_positions_endpoint': '/gtfs/realtime/vehicle-positions.pbf',
+                    'rss_endpoint': '/gtfs/realtime/rss.xml',
                     'monitor_endpoint': '/monitor'
                 },
                 'data_review_seconds': 7200,
@@ -39,6 +41,13 @@ class Configuration:
                 'username': None,
                 'password': None,
                 'subscriptions': []
+            },
+            'rss': {
+                'title': 'Demo Public Transport Alerts',
+                'description': 'All public transport alerts in realtime as RSS feed.',
+                'language': 'de-DE',
+                'base_url': 'https://yourdomain.dev',
+                'media_url': 'https://yourdomain.dev/media/default.jpg'
             }
         }
 

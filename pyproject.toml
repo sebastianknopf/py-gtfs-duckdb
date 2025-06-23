@@ -13,6 +13,7 @@ dependencies = [
     "duckdb",
     "fastapi",
     "gtfs-realtime-bindings",
+    "lxml",
     "paho-mqtt",
     "polars",
     "protobuf",
