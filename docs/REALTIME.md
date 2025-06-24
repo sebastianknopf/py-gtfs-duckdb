@@ -93,7 +93,7 @@ rvs-1-001-1;de:vpe:03001_:
 The first column is the external ID, the second column is the internal ID. Each external ID can appear only once in a mapping table. All other additional columns are ignored and can be used for internal comments. Please also note, that the mapping table CSV file _does not include headers_ in the first line.
 
 ## GTFS-RT Endpoints
-The GTFS-RT endpoints can be called using every HTTP capable device and contain a valid protobuf GTFS-RT message in their body. By appending the GET parameter `debug` (e.g. `http://127.0.0.1/gtfs/realtime/service-alerts.pbf?debug), the output will be streamed as JSON for debugging purposes.
+The GTFS-RT endpoints can be called using every HTTP capable device and contain a valid protobuf GTFS-RT message in their body. By appending the GET parameter `debug` (e.g. `http://127.0.0.1/gtfs/realtime/service-alerts.pbf?debug`), the output will be streamed as JSON for debugging purposes.
 
 ## RSS Endpoint
 Optionally, the GTFS-RT service alerts can be streamed as basic RSS feed. This enables users without any social media profile to subscribe the RSS feed and become informed about any incident this way.
