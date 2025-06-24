@@ -4,58 +4,11 @@ Running a GTFS-RT server and matching GTFS-RT streams of various source is one o
 All GTFS-RT data are exposed as protobuf and JSON GTFS-RT streams using the configured endpoints.
 
 ## Configuration
-For running a GTFS-RT server, you need a configuration YAML file. See following example:
+For running a GTFS-RT server, you need a configuration YAML file. See [gtfsduckdb-realtime.yaml](/gtfsduckdb-realtime.yaml) for reference.
 
-```yaml
-app:
-  caching_enabled: false
-  monitor_enabled: true
-  cors_enabled: true
-  mqtt_enabled: true
-  rss_enabled: false
-  routing:
-    service_alerts_endpoint: /gtfs/realtime/service-alerts.pbf
-    trip_updates_endpoint: /gtfs/realtime/trip-updates.pbf
-    vehicle_positions_endpoint: /gtfs/realtime/vehicle-positions.pbf
-    rss_endpoint: /gtfs/realtime/rss.xml
-    monitor_endpoint: /monitor
-  data_review_seconds: 7200
-  timezone: 'Europe/Berlin'
-caching:
-  caching_server_endpoint: [MemcachedServerInstance]
-  caching_service_alerts_ttl_seconds: 60
-  caching_trip_updates_ttl_seconds: 30
-  caching_vehicle_positions_ttl_seconds: 15
-matching:
-  match_against_first_stop_id: true
-  match_against_stop_ids: false
-  remove_invalid_stop_ids: true
-mqtt:
-  host: test.mosquitto.org
-  port: 1883
-  client: gtfslake-realtime
-  keepalive: 60
-  username: null
-  password: null
-  subscriptions:
-    - topic: realtime/sample/service-alerts/#
-      type: gtfsrt-service-alerts
-      mapping:
-        routes: ./routes_mapping.csv
-        stops: ./stops_mapping.csv
-    - topic: realtime/sample/tripupdates/#
-      type: gtfsrt-trip-updates
-    - topic: realtime/sample/vehiclepositions/#
-      type: gtfsrt-vehicle-positions
-rss:
-  title: Demo Public Transport Alerts
-  description: All public transport alerts in realtime as RSS feed.
-  language: de-DE
-  base_url: https://yourdomain.dev
-  media_url: https://yourdomain.dev/image.jpg
-```
+Using the `app` key, you can enable / disable several features within the GTFS-RT server. For example, there's a simple monitor giving an overview over all trips and their realtime state as well all service alerts which are in the system currently. You also can define custom routes for the GTFS-RT endpoints.
 
-Using the `app` key, you can enable / disable several features within the GTFS-RT server. For example, there's a simple monitor giving an overview over all trips and their realtime state as well all service alerts which are in the system currently. You also can define custom routes for the GTFS-RT endpoints. 
+_Note: If a configuration key is not defined explicitly, its default value of [gtfsduckdb-realtime.yaml](/gtfsduckdb-realtime.yaml) will be used._
 
 ### Data Review Time
 By using the key `data_review_seconds` you can define how long realtime data are kept in the system after their last update.
