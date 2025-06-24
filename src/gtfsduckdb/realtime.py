@@ -583,11 +583,12 @@ class GtfsRealtimeServer:
             service_alert: dict = obj['alert']
             title: str = service_alert['header_text']
             link: str = service_alert['url']
-            guid: str = service_alert['service_alert_id']
+            guid: str = obj['id']
             
             active_periods: list = service_alert['active_period']
             if len(active_periods) > 0:
-                start_time: datetime = datetime.fromtimestamp(int(active_periods['start_timestamp'].to_list()[0]), tz=timezone.utc)
+                earliest_start_timestamp: int = min(int(ap['start']) for ap in active_periods if 'start' in ap and ap['start'] is not None)
+                start_time: datetime = datetime.fromtimestamp(earliest_start_timestamp, tz=timezone.utc)
                 pub_date: str = start_time.strftime('%a, %d %b %Y %H:%M:%S %z')
             else:
                 pub_date: str = 'null'
