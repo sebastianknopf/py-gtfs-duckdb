@@ -4,11 +4,11 @@ This package provides several python utilities to read, aggregate, merge, modify
 ## Core Functionaliy
 GTFS-DuckDB supports several core functionalities, described as follows:
 
-- Load and merge ("drop") GTFS static feeds: Several GTFS static feeds can be loaded and merged using different [strategies](docs/STRATEGIES.md). Even huge GTFS feeds (e.g. whole Baden-Württemberg) are working properly.
+- Load and merge ("drop") GTFS static feeds: Several GTFS static feeds can be loaded and merged using different strategies. Even huge GTFS feeds (e.g. whole Baden-Württemberg) are working properly.
 - Remove unwanted agencies, routes or trips and their related objects
 - Execute SQL statements on the GTFS data directly
 - Export modified and merged GTFS datasets
-- Grabbing up realtime data and match them against the loaded static data. Matched realtime data are exposed with GTFS-RT endpoints providing a GTFS-RT server.
+- Grabbing up realtime data from different GTFS-RT feeds and match them against the loaded static data. Matched realtime data are exposed with GTFS-RT endpoints providing a GTFS-RT server.
 
 The functionalities are used in production and also tested in a working GoogleMaps integration.
 
