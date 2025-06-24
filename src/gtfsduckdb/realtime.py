@@ -285,88 +285,7 @@ class GtfsRealtimeServer:
                 return Response(content=cached_response, media_type=mime_type)
 
         # if there're no data cached, fetch and create them
-        service_alerts, alert_active_periods, alert_informed_entities = self._ddb.fetch_realtime_service_alerts()
-
-        objects = list()
-        for service_alert in service_alerts.iter_rows(named=True):
-
-            obj = dict()
-            obj['id'] = service_alert['service_alert_id']
-
-            obj['alert'] = dict()
-            obj['alert']['cause'] = service_alert['cause']
-            obj['alert']['effect'] = service_alert['effect']
-
-            if service_alert['url'] is not None:
-                obj['alert']['url'] = dict()
-                obj['alert']['url']['translation'] = list()
-                obj['alert']['url']['translation'].append({
-                    'text': service_alert['url'],
-                    'language': 'de-DE'
-                })
-
-            obj['alert']['header_text'] = dict()
-            obj['alert']['header_text']['translation'] = list()
-            obj['alert']['header_text']['translation'].append({
-                'text': service_alert['header_text'],
-                'language': 'de-DE'
-            })
-
-            if service_alert['tts_header_text'] is not None:
-                obj['alert']['tts_header_text'] = dict()
-                obj['alert']['tts_header_text']['translation'] = list()
-                obj['alert']['tts_header_text']['translation'].append({
-                    'text': service_alert['tts_header_text'],
-                    'language': 'de-DE'
-                })
-
-            obj['alert']['description_text'] = dict()
-            obj['alert']['description_text']['translation'] = list()
-            obj['alert']['description_text']['translation'].append({
-                'text': service_alert['description_text'],
-                'language': 'de-DE'
-            })
-
-            if service_alert['tts_description_text'] is not None:
-                obj['alert']['tts_description_text'] = dict()
-                obj['alert']['tts_description_text']['translation'] = list()
-                obj['alert']['tts_description_text']['translation'].append({
-                    'text': service_alert['tts_description_text'],
-                    'language': 'de-DE'
-                })
-
-            obj['alert']['active_period'] = list()
-            obj['alert']['informed_entity'] = list()
-
-            for active_period in alert_active_periods.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
-                obj['alert']['active_period'].append({
-                    'start': active_period['start_timestamp'],
-                    'end': active_period['end_timestamp']
-                })
-
-            for informed_entity in alert_informed_entities.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
-                ie = dict()
-
-                if informed_entity['agency_id'] is not None:
-                    ie['agency_id'] = informed_entity['agency_id']
-
-                if informed_entity['route_id'] is not None:
-                    ie['route_id'] = informed_entity['route_id']    
-
-                if informed_entity['route_type'] is not None:
-                    ie['route_type'] = informed_entity['route_type']
-
-                if informed_entity['stop_id'] is not None:
-                    ie['stop_id'] = informed_entity['stop_id']
-
-                # request trip descriptor, if None, there's no trip informed
-                trip_descriptor = self._create_trip_descriptor(informed_entity)
-                if trip_descriptor is not None:
-                    ie['trip'] = trip_descriptor
-
-                obj['alert']['informed_entity'].append(ie)
-
-            objects.append(obj)
+        objects: list[dict] = self._load_service_alerts()
 
         # send response
         feed_message = self._create_feed_message(objects)
@@ -479,7 +398,6 @@ class GtfsRealtimeServer:
                 self._cache.set(f"{request.url.path}-{format}", pbf_result, self._config['caching']['caching_trip_updates_ttl_seconds'])
 
             return Response(content=pbf_result, media_type='application/octet-stream')
-
 
     async def _vehicle_positions(self, request: Request) -> Response:
 
@@ -639,7 +557,7 @@ class GtfsRealtimeServer:
             
             return Response(content=html, media_type='text/html')
         
-    def _rss(self):
+    async def _rss(self):
 
         rss = {
             '#version': '2.0',
@@ -658,21 +576,24 @@ class GtfsRealtimeServer:
         }
 
         # fetch data and convert them to RSS format
-        service_alerts, alert_active_periods, alert_informed_entities = self._ddb.fetch_realtime_service_alerts()
-
-        for service_alert in service_alerts.iter_rows(named=True):
-            title: str = service_alert['header_text']
-            link: str = service_alert['url']
-            guid: str = service_alert['service_alert_id']
+        objects: list[dict] = self._load_service_alerts()
+        
+        # generate RSS messages for each alert
+        for obj in objects:
+            service_alert: dict = obj['alert']
+            title: str = service_alert['header_text']['translation'][0]['text']
+            link: str = service_alert['url']['translation'][0]['text']
+            guid: str = obj['id']
             
-            active_periods = alert_active_periods.filter(pl.col('service_alert_id') == service_alert['service_alert_id'])
+            active_periods: list = service_alert['active_period']
             if len(active_periods) > 0:
-                start_time: datetime = datetime.fromtimestamp(int(active_periods['start_timestamp'].to_list()[0]), tz=timezone.utc)
+                earliest_start_timestamp: int = min(int(ap['start']) for ap in active_periods if 'start' in ap and ap['start'] is not None)
+                start_time: datetime = datetime.fromtimestamp(earliest_start_timestamp, tz=timezone.utc)
                 pub_date: str = start_time.strftime('%a, %d %b %Y %H:%M:%S %z')
             else:
                 pub_date: str = 'null'
             
-            description: str = service_alert['description_text']
+            description: str = service_alert['description_text']['translation'][0]['text']
 
             rss['channel']['item'].append({
                 'title': title,
@@ -699,6 +620,108 @@ class GtfsRealtimeServer:
             nsmap=namespaces
         ), media_type='application/rss+xml')
 
+    def _load_service_alerts(self) -> list[dict]:
+        service_alerts, alert_active_periods, alert_informed_entities = self._ddb.fetch_realtime_service_alerts()
+
+        objects = list()
+        for service_alert in service_alerts.iter_rows(named=True):
+
+            obj = dict()
+            obj['id'] = service_alert['service_alert_id']
+
+            obj['alert'] = dict()
+            obj['alert']['cause'] = service_alert['cause']
+            obj['alert']['effect'] = service_alert['effect']
+
+            if service_alert['url'] is not None:
+                obj['alert']['url'] = dict()
+                obj['alert']['url']['translation'] = list()
+                obj['alert']['url']['translation'].append({
+                    'text': service_alert['url'],
+                    'language': 'de-DE'
+                })
+
+            obj['alert']['header_text'] = dict()
+            obj['alert']['header_text']['translation'] = list()
+            obj['alert']['header_text']['translation'].append({
+                'text': service_alert['header_text'],
+                'language': 'de-DE'
+            })
+
+            if service_alert['tts_header_text'] is not None:
+                obj['alert']['tts_header_text'] = dict()
+                obj['alert']['tts_header_text']['translation'] = list()
+                obj['alert']['tts_header_text']['translation'].append({
+                    'text': service_alert['tts_header_text'],
+                    'language': 'de-DE'
+                })
+
+            obj['alert']['description_text'] = dict()
+            obj['alert']['description_text']['translation'] = list()
+            obj['alert']['description_text']['translation'].append({
+                'text': service_alert['description_text'],
+                'language': 'de-DE'
+            })
+
+            if service_alert['tts_description_text'] is not None:
+                obj['alert']['tts_description_text'] = dict()
+                obj['alert']['tts_description_text']['translation'] = list()
+                obj['alert']['tts_description_text']['translation'].append({
+                    'text': service_alert['tts_description_text'],
+                    'language': 'de-DE'
+                })
+
+            obj['alert']['active_period'] = list()
+            obj['alert']['informed_entity'] = list()
+
+            for active_period in alert_active_periods.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
+                obj['alert']['active_period'].append({
+                    'start': active_period['start_timestamp'],
+                    'end': active_period['end_timestamp']
+                })
+
+            for informed_entity in alert_informed_entities.filter(pl.col('service_alert_id') == service_alert['service_alert_id']).iter_rows(named=True):
+                ie = dict()
+
+                if informed_entity['agency_id'] is not None:
+                    ie['agency_id'] = informed_entity['agency_id']
+
+                if informed_entity['route_id'] is not None:
+                    ie['route_id'] = informed_entity['route_id']    
+
+                if informed_entity['route_type'] is not None:
+                    ie['route_type'] = informed_entity['route_type']
+
+                if informed_entity['stop_id'] is not None:
+                    ie['stop_id'] = informed_entity['stop_id']
+
+                # request trip descriptor, if None, there's no trip informed
+                trip_descriptor = self._create_trip_descriptor(informed_entity)
+                if trip_descriptor is not None:
+                    ie['trip'] = trip_descriptor
+
+                obj['alert']['informed_entity'].append(ie)
+
+            objects.append(obj)
+
+        # sort alerts by their earliest active period
+        # see #34 for more information
+        sorted_service_alerts: list = list()
+        for obj in objects:
+            earliest: int = 999999999999999999
+            for ap in obj['alert']['active_period']:
+                if 'start' in ap and ap['start'] < earliest:
+                    earliest = ap['start']
+
+            sorted_service_alerts.append({
+                'sort': earliest,
+                'object': obj
+            })
+
+        sorted_service_alerts.sort(key=lambda x: x['sort'], reverse=True)
+
+        # extract final alert objects and return them
+        return [a['object'] for a in sorted_service_alerts]
 
     def _create_feed_message(self, entities):
         timestamp = datetime.now().astimezone(pytz.timezone(self._config['app']['timezone'])).timestamp()
