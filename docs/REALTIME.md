@@ -70,6 +70,12 @@ Matching incoming realtime data against the existing static data has several opt
 
 _Hint: Matching is currently only performed for GTFS-RT trip updates! Other entity types are not matched, but can be used with mapping tables_
 
+### GTFS-RT Endpoints
+The GTFS-RT endpoints can be called using every HTTP capable device and contain a valid protobuf GTFS-RT message in their body. By appending the GET parameter `debug` (e.g. `http://127.0.0.1/gtfs/realtime/service-alerts.pbf?debug), the output will be streamed as JSON for debugging purposes.
+
+### RSS Endpoint
+Optionally, the GTFS-RT service alerts can be streamed as basic RSS feed. This enables users without any social media profile to subscribe the RSS feed and become informed about any incident this way.
+
 ### MQTT
 GTFS-DuckDB uses differential GTFS-RT data transmitted over a MQTT broker. See [gtfsrt2mqtt](https://github.com/sebastianknopf/gtfsrt2mqtt) for transforming a GTFS-RT stream into MQTT topics. To make GTFS-DuckDB processing the GTFS-RT data, the corresponding topics have to be subscribed at the MQTT broker using the following syntax in the config YAML file:
 
