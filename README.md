@@ -12,8 +12,6 @@ GTFS-DuckDB supports several core functionalities, described as follows:
 
 The functionalities are used in production and also tested in a working GoogleMaps integration.
 
-See [commands cheat-sheet](docs/COMMANDS.md) for reference how to use the GTFS-DuckDB.
-
 ## Installation
 You can use the GTFS-DuckDB by cloning this repository and install it into your virtual environment directly:
 ```bash
@@ -22,10 +20,8 @@ cd py-gtfs-duckdb
 
 pip install .
 ```
-and run it by using
-```bash
-python -m gtfsduckdb {command} {arguments} [options]
-```
+
+See [commands cheat-sheet](docs/COMMANDS.md) for reference how to use the GTFS-DuckDB.
 
 ## License
 This project is licensed under the Apache License. See [LICENSE.md](LICENSE.md) for more information.
