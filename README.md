@@ -8,7 +8,7 @@ GTFS-DuckDB supports several core functionalities, described as follows:
 - Remove unwanted agencies, routes or trips and their related objects
 - Execute SQL statements on the GTFS data directly
 - Export modified and merged GTFS datasets
-- Grabbing up realtime data from different GTFS-RT feeds and match them against the loaded static data. Matched realtime data are exposed with GTFS-RT endpoints providing a GTFS-RT server.
+- **Running a GTFS-RT server grabbing realtime data of several different sources**
 
 The functionalities are used in production and also tested in a working GoogleMaps integration.
 
@@ -22,6 +22,11 @@ pip install .
 ```
 
 See [commands cheat-sheet](docs/COMMANDS.md) for reference how to use the GTFS-DuckDB.
+
+## Realtime Server
+GTFS-DuckDB can act as a GTFS-RT server and is used in production environments for serving GoogleMaps.
+
+See [realtime configuration](docs/REALTIME.md) for more information about running a realtime server.
 
 ## License
 This project is licensed under the Apache License. See [LICENSE.md](LICENSE.md) for more information.

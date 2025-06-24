@@ -1,5 +1,7 @@
 # Running a GTFS Realtime Server
-Running a GTFS-RT server and matching GTFS-RT streams of various source is one of the core functions of GTFS-DuckDB. To handle different GTFS-RT data streams in realtime, GTFS-DuckDB works with differential GTFS-RT data published using a MQTT broker. 
+Running a GTFS-RT server and matching GTFS-RT streams of various source is one of the core functions of GTFS-DuckDB. To handle different GTFS-RT data streams in realtime, GTFS-DuckDB works with differential GTFS-RT data published using a MQTT broker.
+
+All GTFS-RT data are exposed as protobuf and JSON GTFS-RT streams using the configured endpoints.
 
 ## Configuration
 For running a GTFS-RT server, you need a configuration YAML file. See following example:
