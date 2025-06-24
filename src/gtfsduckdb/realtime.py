@@ -581,8 +581,8 @@ class GtfsRealtimeServer:
         # generate RSS messages for each alert
         for obj in objects:
             service_alert: dict = obj['alert']
-            title: str = service_alert['header_text']
-            link: str = service_alert['url']
+            title: str = service_alert['header_text']['translation'][0]['text']
+            link: str = service_alert['url']['translation'][0]['text']
             guid: str = obj['id']
             
             active_periods: list = service_alert['active_period']
@@ -593,7 +593,7 @@ class GtfsRealtimeServer:
             else:
                 pub_date: str = 'null'
             
-            description: str = service_alert['description_text']
+            description: str = service_alert['description_text']['translation'][0]['text']
 
             rss['channel']['item'].append({
                 'title': title,
