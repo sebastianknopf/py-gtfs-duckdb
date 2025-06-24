@@ -1,1 +1,93 @@
 # Running a GTFS Realtime Server
+Running a GTFS-RT server and matching GTFS-RT streams of various source is one of the core functions of GTFS-DuckDB. To handle different GTFS-RT data streams in realtime, GTFS-DuckDB works with differential GTFS-RT data published using a MQTT broker. 
+
+## Configuration
+For running a GTFS-RT server, you need a configuration YAML file. See following example:
+
+```yaml
+app:
+  caching_enabled: false
+  monitor_enabled: true
+  cors_enabled: true
+  mqtt_enabled: true
+  rss_enabled: false
+  routing:
+    service_alerts_endpoint: /gtfs/realtime/service-alerts.pbf
+    trip_updates_endpoint: /gtfs/realtime/trip-updates.pbf
+    vehicle_positions_endpoint: /gtfs/realtime/vehicle-positions.pbf
+    rss_endpoint: /gtfs/realtime/rss.xml
+    monitor_endpoint: /monitor
+  data_review_seconds: 7200
+  timezone: 'Europe/Berlin'
+caching:
+  caching_server_endpoint: [MemcachedServerInstance]
+  caching_service_alerts_ttl_seconds: 60
+  caching_trip_updates_ttl_seconds: 30
+  caching_vehicle_positions_ttl_seconds: 15
+matching:
+  match_against_first_stop_id: true
+  match_against_stop_ids: false
+  remove_invalid_stop_ids: true
+mqtt:
+  host: test.mosquitto.org
+  port: 1883
+  client: gtfslake-realtime
+  keepalive: 60
+  username: null
+  password: null
+  subscriptions:
+    - topic: realtime/sample/service-alerts/#
+      type: gtfsrt-service-alerts
+      mapping:
+        routes: ./routes_mapping.csv
+        stops: ./stops_mapping.csv
+    - topic: realtime/sample/tripupdates/#
+      type: gtfsrt-trip-updates
+    - topic: realtime/sample/vehiclepositions/#
+      type: gtfsrt-vehicle-positions
+rss:
+  title: Demo Public Transport Alerts
+  description: All public transport alerts in realtime as RSS feed.
+  language: de-DE
+  base_url: https://yourdomain.dev
+  media_url: https://yourdomain.dev/image.jpg
+```
+
+Using the `app` key, you can enable / disable several features within the GTFS-RT server. For example, there's a simple monitor giving an overview over all trips and their realtime state as well all service alerts which are in the system currently. You also can define custom routes for the GTFS-RT endpoints. 
+
+### Data Review Time
+By using the key `data_review_seconds` you can define how long realtime data are kept in the system after their last update.
+
+### Caching
+GTFS-RT endpoints can be cached using an external running instance of memcached. To enable caching, the key `app.caching_enabled` needs to be set to `true` and the configuration for `caching` has to be filled with proper values.
+
+## Matching
+Matching incoming realtime data against the existing static data has several options explained in the following section:
+
+- **match_against_first_stop_id**: A GTFS-RT trip update is matched using the first stop ID (stop_sequence=1). If this ID differs from possible nominal candidates, the GTFS-RT trip update is discarded
+- **match_against_stop_ids**: Like **match_against_first_stop_id**, but more strict. Matches all stop IDs against the possible nominal candidates. If at least one stop ID differs, the GTFS-RT trip update is discarded
+- **remove_invalid_stop_ids**: Ignores all stop IDs which are not present in the nominal trip candidate
+
+_Hint: Matching is currently only performed for GTFS-RT trip updates! Other entity types are not matched, but can be used with mapping tables_
+
+### MQTT
+GTFS-DuckDB uses differential GTFS-RT data transmitted over a MQTT broker. See [gtfsrt2mqtt](https://github.com/sebastianknopf/gtfsrt2mqtt) for transforming a GTFS-RT stream into MQTT topics. To make GTFS-DuckDB processing the GTFS-RT data, the corresponding topics have to be subscribed at the MQTT broker using the following syntax in the config YAML file:
+
+```yaml
+- topic: realtime/sample/service-alerts/#
+  type: gtfsrt-service-alerts
+  mapping:
+      routes: ./routes_mapping.csv
+      stops: ./stops_mapping.csv
+```
+
+**`topic`**: The topic name to be subscribed, including MQTT defined wildcards
+**`type`**: Type of data, which are transmitted using this topic. Currently available are `gtfsrt-service-alerts`, `gtfsrt-trip-updates` and `gtfsrt-vehicle-positions` (not implemented yet!)
+
+Optionally you can define mapping tables for routes and stops. By using mapping tables, you have the option to map external IDs to your internal IDs manually which cannot be matched like trip updates. A mapping table needs to be defined in the following format:
+
+```csv
+rvs-1-001-1;de:vpe:03001_:
+```
+
+The first column is the external ID, the second column is the internal ID. Each external ID can appear only once in a mapping table. All other additional columns are ignored and can be used for internal comments. Please also note, that the mapping table CSV file _does not include headers_ in the first line.
