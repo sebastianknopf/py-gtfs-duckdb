@@ -36,7 +36,7 @@ To merge ("drop") another GTFS dataset to the existing GTFS dataset, run
 ```bash
 python -m gtfsduckdb drop ./database.ddb -i ./additional-gtfs.zip [-s match_stop_id]
 ``` 
-Additional data are added to the existing GTFS data using certain merging strategies. See [strategies overview](STRATEGY.py) for reference.
+Additional data are added to the existing GTFS data using certain merging strategies. See [strategies overview](STRATEGY.md) for reference.
 
 Options:
 - -i/--inputs       Path to additional GTFS feeds to be added; can be separated by comma
