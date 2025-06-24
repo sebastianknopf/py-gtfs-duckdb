@@ -22,7 +22,7 @@ Options:
 ## remove
 To remove unwanted data from the loaded GTFS data, run
 ```bash
-python -m gtfsduckdb load ./database.ddb -a agency-1 -r de:vpe:04* -t de:vpe:trip:12345,de:vpe:trip:6789
+python -m gtfsduckdb remove ./database.ddb -a agency-1 -r de:vpe:04* -t de:vpe:trip:12345,de:vpe:trip:6789
 ``` 
 All objects, which are not related to other objects anymore after deleting some entities, are also removed entirely.
 
@@ -61,7 +61,7 @@ Options:
 ## realtime
 To start a GTFS-RT compliant realtime server, run
 ```bash
-python -m gtfsduckdb sql ./database.ddb -f ./sql_statement.sql
+python -m gtfsduckdb realtime ./database.ddb -h 127.0.0.1 -p 8080 -c ./gtfsduckdb-realtime.yaml
 ``` 
 Please see detailed information [about running a realtime server](docs/REALTIME.md).
 
