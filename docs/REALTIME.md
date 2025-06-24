@@ -61,7 +61,7 @@ By using the key `data_review_seconds` you can define how long realtime data are
 ### Caching
 GTFS-RT endpoints can be cached using an external running instance of memcached. To enable caching, the key `app.caching_enabled` needs to be set to `true` and the configuration for `caching` has to be filled with proper values.
 
-## Matching
+### Matching
 Matching incoming realtime data against the existing static data has several options explained in the following section:
 
 - **match_against_first_stop_id**: A GTFS-RT trip update is matched using the first stop ID (stop_sequence=1). If this ID differs from possible nominal candidates, the GTFS-RT trip update is discarded
@@ -81,10 +81,10 @@ GTFS-DuckDB uses differential GTFS-RT data transmitted over a MQTT broker. See [
       stops: ./stops_mapping.csv
 ```
 
-**`topic`**: The topic name to be subscribed, including MQTT defined wildcards
-**`type`**: Type of data, which are transmitted using this topic. Currently available are `gtfsrt-service-alerts`, `gtfsrt-trip-updates` and `gtfsrt-vehicle-positions` (not implemented yet!)
+- **`topic`**: The topic name to be subscribed, including MQTT defined wildcards
+- **`type`**: Type of data, which are transmitted using this topic. Currently available are `gtfsrt-service-alerts`, `gtfsrt-trip-updates` and `gtfsrt-vehicle-positions` (not implemented yet!)
 
-Optionally you can define mapping tables for routes and stops. By using mapping tables, you have the option to map external IDs to your internal IDs manually which cannot be matched like trip updates. A mapping table needs to be defined in the following format:
+- **`mapping`**: Optionally you can define mapping tables for routes and stops. By using mapping tables, you have the option to map external IDs to your internal IDs manually which cannot be matched like trip updates. A mapping table needs to be defined in the following format:
 
 ```csv
 rvs-1-001-1;de:vpe:03001_:
