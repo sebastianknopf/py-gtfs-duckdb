@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    needs: build
+    # needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Important: Allow to modify the repository
