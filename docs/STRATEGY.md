@@ -1,0 +1,4 @@
+# Merging Strategies
+Merging two GTFS feeds is quite difficult sometimes, as the quality of GTFS data all over the world is extremely various. Merging two feeds always depends on the data quality and the data contained in the GTFS data in general. Most cruical is merging the network data like stops and routes. To handle merging optimally, follpwing merging strategies are implemented currently:
+
+- **match_stop_id**: Matches all stops (including their hierarchy) by their IDs. Intended for use with GTFS feeds containing [global IDs](https://knowhow.vdv.de/documents/432/). All matched existing stops in the base GTFS datasets are updated with the data from the GTFS subset. Non-matched stops are added to the base GTFS dataset.
