@@ -155,7 +155,7 @@ schema = {
         shape_id				TEXT,
         wheelchair_accessible	TEXT,
         bikes_allowed			TEXT,
-        ticketing_deep_link_id  TEXT,
+        ticketing_trip_id       TEXT,
         ticketing_type          TEXT,
         PRIMARY KEY ( trip_id )
     )
