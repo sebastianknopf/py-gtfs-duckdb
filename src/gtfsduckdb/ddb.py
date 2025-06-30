@@ -119,7 +119,7 @@ class GtfsDuckDB:
             ]
 
             column_blacklist['trips'] = [
-                'ticketing_deep_link_id',
+                'ticketing_trip_id',
                 'ticketing_type'
             ]
 
