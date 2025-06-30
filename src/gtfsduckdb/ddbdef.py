@@ -64,9 +64,9 @@ schema = {
         route_url				TEXT,
         route_color			    TEXT,
         route_text_color		TEXT,
-        route_sort_order		INTEGER,
-        continuous_pickup		INTEGER,
-        continuous_drop_off	    INTEGER,
+        route_sort_order		TEXT,
+        continuous_pickup		TEXT,
+        continuous_drop_off	    TEXT,
         network_id				TEXT,
         PRIMARY KEY ( route_id )
     ) 
@@ -96,12 +96,12 @@ schema = {
         end_pickup_drop_off_window 	    TEXT,
         pickup_type					    TEXT,
         drop_off_type					TEXT,
-        continuous_pickup				INTEGER,
-        continuous_drop_off			    INTEGER,
+        continuous_pickup				TEXT,
+        continuous_drop_off			    TEXT,
         shape_dist_traveled			    TEXT,
-        timepoint						INTEGER,
-        pickup_booking_rule_id			INTEGER,
-        drop_off_booking_rule_id		INTEGER,
+        timepoint						TEXT,
+        pickup_booking_rule_id			TEXT,
+        drop_off_booking_rule_id		TEXT,
         PRIMARY KEY ( trip_id, stop_id, stop_sequence )
     )
     """,
