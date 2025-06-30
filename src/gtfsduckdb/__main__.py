@@ -67,10 +67,11 @@ def drop(database, inputs, strategy):
 @cli.command()
 @click.argument('database')
 @click.option('--output', '-o', help='Destination directory or ZIP file containing GTFS data')
-def export(database, output):
+@click.option('--extensions', '-e', default=None, help='Comma separated list of extension names to be included in the export')
+def export(database, output, extensions):
     
     ddb = GtfsDuckDB(database)
-    ddb.export_static(output)
+    ddb.export_static(output, extensions)
 
 @cli.command()
 @click.argument('database')

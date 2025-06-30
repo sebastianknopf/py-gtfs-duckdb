@@ -98,11 +98,46 @@ class GtfsDuckDB:
         strategy = importlib.import_module(f"gtfslake.strategy.{strategy_name}")
         strategy.run(self._connection, subset, self.static_tables)
 
-    def export_static(self, output, tmpdir=tempfile.gettempdir()):
+    def export_static(self, output, extensions=None, tmpdir=tempfile.gettempdir()):
+        # keep track of all specified extensions to GTFS
+        extensions = [e.strip() for e in extensions.split(',')] if extensions is not None else list()
+
+        # generate blacklists for all columns and tables which shall not be exported in case of a non specified extension
+        table_blacklist: list = list()
+        column_blacklist: dict[str, list] = dict()
+
+        if 'tte' not in extensions:
+            table_blacklist.append('ticketing_deep_links')
+            table_blacklist.append('ticketing_identifiers')
+
+            column_blacklist['agency'] = [
+                'ticketing_deep_link_id'
+            ]
+
+            column_blacklist['routes'] = [
+                'ticketing_deep_link_id'
+            ]
+
+            column_blacklist['trips'] = [
+                'ticketing_deep_link_id',
+                'ticketing_type'
+            ]
+
+            column_blacklist['stop_times'] = [
+                'ticketing_type'
+            ]
+        
+        # export all tables with respect to the former generated filters
         if os.path.isdir(output):
             for tbl in self.static_tables:
-                filename = os.path.join(output, f"{tbl}.txt")
-                self._connection.sql(f"SELECT * FROM {tbl}").write_csv(filename, sep=',')
+                if tbl not in table_blacklist:
+                    columns: list = list()
+                    for record in self._connection.execute(f"DESCRIBE {tbl}").pl().iter_rows(named=True):
+                        if tbl not in column_blacklist or (tbl in column_blacklist and record['column_name'] not in column_blacklist[tbl]):
+                            columns.append(record['column_name'])
+
+                    filename = os.path.join(output, f"{tbl}.txt")
+                    self._connection.sql(f"SELECT {','.join(columns)} FROM {tbl}").write_csv(filename, sep=',')
 
         elif output.lower().endswith('.zip'):
             tmp_files = dict()
@@ -110,11 +145,17 @@ class GtfsDuckDB:
             try:
                 # export all tables to temporary txt files
                 for tbl in self.static_tables:
-                    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-                        filename = tmp.name
-                        tmp_files[f"{tbl}.txt"] = filename
+                    if tbl not in table_blacklist:
+                        columns: list = list()
+                        for record in self._connection.execute(f"DESCRIBE {tbl}").pl().iter_rows(named=True):
+                            if tbl not in column_blacklist or (tbl in column_blacklist and record['column_name'] not in column_blacklist[tbl]):
+                                columns.append(record['column_name'])
+                            
+                        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                            filename = tmp.name
+                            tmp_files[f"{tbl}.txt"] = filename
 
-                    self._connection.sql(f"SELECT * FROM {tbl}").write_csv(filename, sep=',')
+                        self._connection.sql(f"SELECT {','.join(columns)} FROM {tbl}").write_csv(filename, sep=',')
 
                 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as gtfs_static_file:
                     for txt_filename, tmp_filename in tmp_files.items():
