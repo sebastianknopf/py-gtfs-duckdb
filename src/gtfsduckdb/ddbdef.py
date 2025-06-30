@@ -2,14 +2,15 @@ schema = {
     'agency': """
     CREATE TABLE IF NOT EXISTS agency
     (
-        agency_id              TEXT NOT NULL,
-        agency_name            TEXT NOT NULL,
-        agency_url             TEXT NOT NULL,
-        agency_timezone        TEXT NOT NULL,
-        agency_lang            TEXT,
-        agency_phone           TEXT,
-        agency_fare_url        TEXT,
-        agency_email           TEXT,
+        agency_id               TEXT NOT NULL,
+        agency_name             TEXT NOT NULL,
+        agency_url              TEXT NOT NULL,
+        agency_timezone         TEXT NOT NULL,
+        agency_lang             TEXT,
+        agency_phone            TEXT,
+        agency_fare_url         TEXT,
+        agency_email            TEXT,
+        ticketing_deep_link_id  TEXT,
         PRIMARY KEY ( agency_id )
     )
     """,
@@ -68,6 +69,7 @@ schema = {
         continuous_pickup		TEXT,
         continuous_drop_off	    TEXT,
         network_id				TEXT,
+        ticketing_deep_link_id  TEXT,
         PRIMARY KEY ( route_id )
     ) 
     """,
@@ -102,6 +104,7 @@ schema = {
         timepoint						TEXT,
         pickup_booking_rule_id			TEXT,
         drop_off_booking_rule_id		TEXT,
+        ticketing_type                  TEXT,
         PRIMARY KEY ( trip_id, stop_id, stop_sequence )
     )
     """,
@@ -152,6 +155,8 @@ schema = {
         shape_id				TEXT,
         wheelchair_accessible	TEXT,
         bikes_allowed			TEXT,
+        ticketing_deep_link_id  TEXT,
+        ticketing_type          TEXT,
         PRIMARY KEY ( trip_id )
     )
     """,
