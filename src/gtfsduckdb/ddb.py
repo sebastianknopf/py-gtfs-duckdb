@@ -31,7 +31,9 @@ class GtfsDuckDB:
             'stop_times',
             'stops',
             'transfers',
-            'trips'
+            'trips',
+            'ticketing_deep_links',
+            'ticketing_identifiers'
         ]
 
         self.realtime_tables = [
@@ -67,7 +69,7 @@ class GtfsDuckDB:
         with zipfile.ZipFile(gtfs_static_filename) as gtfs_static_file:
             for txt_filename in gtfs_static_file.namelist():
                 if txt_filename.replace('.txt', '') in self.static_tables:
-                    with io.TextIOWrapper(gtfs_static_file.open(txt_filename), encoding='utf-8') as txt_file:
+                    with io.TextIOWrapper(gtfs_static_file.open(txt_filename), encoding='utf-8-sig') as txt_file:
                         logging.info(f"loading {txt_filename}")
                         
                         self._load_txt_file(txt_file, txt_filename.replace('.txt', ''))
@@ -378,8 +380,8 @@ class GtfsDuckDB:
             if len(records) >= self._batch_size:
                 df = polars.DataFrame(records, schema=headers, orient='row')
                 self._connection.execute(f"INSERT INTO {table_name} ({','.join(headers)}) SELECT * FROM df")
-                records = list()
-
+                records = list()                    
+        
         df = polars.DataFrame(records, schema=headers, orient='row')
         self._connection.execute(f"INSERT INTO {table_name} ({','.join(headers)}) SELECT * FROM df")
         records = list()
